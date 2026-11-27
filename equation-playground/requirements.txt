@@ -1,0 +1,9 @@
+sympy
+numpy
+scipy
+contourpy
+plotly
+streamlit
+trimesh
+fast-simplification
+pytest
