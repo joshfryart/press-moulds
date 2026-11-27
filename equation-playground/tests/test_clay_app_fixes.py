@@ -82,3 +82,18 @@ def test_app_live_3d_model(tmp_path):
     assert mesh.is_watertight and len(mesh.faces) > 100
     at.text_area[0].set_value("z = a sin(x) cos(y)").run()
     assert not at.exception and at.session_state["live3d"].is_watertight
+
+
+def test_app_view_switch_3d_2d(tmp_path):
+    from streamlit.testing.v1 import AppTest
+    for f in ("app.py", "core.py", "geometry.py", "clay.py", "anim.py"):
+        shutil.copy(ROOT / f, tmp_path / f)
+    at = AppTest.from_file(str(tmp_path / "app.py"), default_timeout=90).run()
+    assert not at.exception
+    r = [x for x in at.radio if x.key == "view_mode"][0]
+    assert r.value == "3D model"
+    r.set_value("2D plot").run()
+    assert not at.exception
+    r = [x for x in at.radio if x.key == "view_mode"][0]
+    r.set_value("3D model").run()
+    assert not at.exception

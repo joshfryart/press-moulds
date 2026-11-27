@@ -236,31 +236,8 @@ if res is None:
     st.stop()
 for w in res.warnings:
     st.warning(w)
-prev = ss.get("shown_res")
-fig, animated = anim.morph_figure(lambda r: make_figure(r, equal), res, prev if animate else None)
-if animated:
-    show_html(anim.to_html(fig), 540)
-else:
-    st.plotly_chart(fig, width="stretch")
-ss["shown_res"] = res
-
-if spec.params:
-    with st.expander("Animate a parameter (drag the slider to watch it change live)"):
-        a1, a2, a3 = st.columns(3)
-        sweep_name = a1.selectbox("Parameter", spec.params, key="sweep_name")
-        sweep_steps = a2.slider("Frames", 10, 60, 30, key="sweep_steps")
-        show_sweep = a3.checkbox("Show sweep", key="sweep_on")
-        if show_sweep:
-            st0 = _store(sweep_name)
-            try:
-                sfig, nfr = anim.sweep_figure(lambda r: make_figure(r, equal), spec, pvals, domain,
-                                              int(min(n_samples, 400)), sweep_name,
-                                              st0["lo"], st0["hi"], sweep_steps)
-                show_html(anim.to_html(sfig, animated=False), 680)
-                st.caption(f"{nfr} frames, {sweep_name} from {st0['lo']:g} to {st0['hi']:g} "
-                           "(change the range in the sidebar).")
-            except ValueError as e:
-                st.warning(str(e))
+# ---------- main view: 3D (default) or 2D ----------
+top = st.container()
 
 # ---------- make it ----------
 st.header("Make it")
@@ -320,33 +297,62 @@ def placed(res):
     return types.SimpleNamespace(kind=res.kind, polylines=pl, closed=res.closed, X=None, Y=None, Z=None)
 
 
-# ---------- live 3D model (rotate with mouse, scroll to zoom) ----------
-st.subheader("3D model")
-if st.checkbox("Show 3D model (drag to rotate, scroll to zoom)", value=True, key="live3d_on"):
-    lpx = max(px, 0.2, size / 220.0)   # coarse pixel keeps it fast; Build gives print quality
-    lkey = json.dumps([ss["text"], pvals, domain, int(n_samples), vars(dataclasses.replace(form_opt, px=lpx)),
-                       rot, flip, two_sided], sort_keys=True, default=str)
-    if ss.get("live3d_key") != lkey:
-        try:
-            r3 = placed(res)
-            fo3 = dataclasses.replace(form_opt, px=lpx)
-            if r3.kind == "surface":
-                H3, _ = geo.surface_heightmap(r3.X, r3.Y, r3.Z, fo3)
-            else:
-                pairs = [(p, c) for p, c in zip(r3.polylines, list(r3.closed) + [False] * len(r3.polylines))
-                         if p is not None and len(p) >= 2]
-                pm = geo.fit_polylines([p for p, _ in pairs], fo3.size_mm)
-                H3, _ = geo.curve_heightmap(pm, [c for _, c in pairs], fo3)
-            ss["live3d"] = geo.form_mesh(H3, lpx, fo3.base_mm, two_sided=bool(two_sided))
-            ss["live3d_key"] = lkey
-            ss["live3d_err"] = None
-        except Exception as e:
-            ss["live3d_err"] = str(e) if isinstance(e, ValueError) else "Could not make the 3D model for these settings."
-    if ss.get("live3d_err"):
-        st.warning(ss["live3d_err"])
-    elif ss.get("live3d") is not None:
-        st.plotly_chart(mesh_figure(ss["live3d"], "Form preview (coarse; press Build for print quality)"),
-                        width="stretch", key="live3d_chart")
+with top:
+    view_mode = st.radio("View", ["3D model", "2D plot"], horizontal=True, key="view_mode",
+                         label_visibility="collapsed",
+                         help="3D: the pressed form, drag to rotate, scroll to zoom. 2D: the equation plot.")
+    if view_mode == "3D model":
+        lpx = max(px, 0.2, size / 220.0)   # coarse pixel keeps it fast; Build gives print quality
+        lkey = json.dumps([ss["text"], pvals, domain, int(n_samples), vars(dataclasses.replace(form_opt, px=lpx)),
+                           rot, flip, two_sided], sort_keys=True, default=str)
+        if ss.get("live3d_key") != lkey:
+            try:
+                r3 = placed(res)
+                fo3 = dataclasses.replace(form_opt, px=lpx)
+                if r3.kind == "surface":
+                    H3, _ = geo.surface_heightmap(r3.X, r3.Y, r3.Z, fo3)
+                else:
+                    pairs = [(p, c) for p, c in zip(r3.polylines, list(r3.closed) + [False] * len(r3.polylines))
+                             if p is not None and len(p) >= 2]
+                    pm = geo.fit_polylines([p for p, _ in pairs], fo3.size_mm)
+                    H3, _ = geo.curve_heightmap(pm, [c for _, c in pairs], fo3)
+                ss["live3d"] = geo.form_mesh(H3, lpx, fo3.base_mm, two_sided=bool(two_sided))
+                ss["live3d_key"] = lkey
+                ss["live3d_err"] = None
+            except Exception as e:
+                ss["live3d_err"] = str(e) if isinstance(e, ValueError) else "Could not make the 3D model for these settings."
+        if ss.get("live3d_err"):
+            st.warning(ss["live3d_err"])
+        elif ss.get("live3d") is not None:
+            st.plotly_chart(mesh_figure(ss["live3d"], "Form preview (coarse; press Build for print quality)"),
+                            width="stretch", key="live3d_chart")
+        ss["shown_res"] = res
+    else:
+        prev = ss.get("shown_res")
+        fig, animated = anim.morph_figure(lambda r: make_figure(r, equal), res, prev if animate else None)
+        if animated:
+            show_html(anim.to_html(fig), 540)
+        else:
+            st.plotly_chart(fig, width="stretch")
+        ss["shown_res"] = res
+
+        if spec.params:
+            with st.expander("Animate a parameter (drag the slider to watch it change live)"):
+                a1, a2, a3 = st.columns(3)
+                sweep_name = a1.selectbox("Parameter", spec.params, key="sweep_name")
+                sweep_steps = a2.slider("Frames", 10, 60, 30, key="sweep_steps")
+                show_sweep = a3.checkbox("Show sweep", key="sweep_on")
+                if show_sweep:
+                    st0 = _store(sweep_name)
+                    try:
+                        sfig, nfr = anim.sweep_figure(lambda r: make_figure(r, equal), spec, pvals, domain,
+                                                      int(min(n_samples, 400)), sweep_name,
+                                                      st0["lo"], st0["hi"], sweep_steps)
+                        show_html(anim.to_html(sfig, animated=False), 680)
+                        st.caption(f"{nfr} frames, {sweep_name} from {st0['lo']:g} to {st0['hi']:g} "
+                                   "(change the range in the sidebar).")
+                    except ValueError as e:
+                        st.warning(str(e))
 
 bc = st.columns([1, 1, 3])
 do_draft = bc[0].button("Draft build", help="Fast look: 0.1 mm pixel. Not for printing.")
