@@ -1,0 +1,246 @@
+[
+ {
+  "n": 1,
+  "name": "Hoop",
+  "eq": "x^2 + y^2 = r^2",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.136,
+  "secs": 3.3
+ },
+ {
+  "n": 2,
+  "name": "Trefoil",
+  "eq": "x = sin(t) + 2 sin(2 t), y = cos(t) - 2 cos(2 t)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.187,
+  "secs": 3.1
+ },
+ {
+  "n": 3,
+  "name": "Three petal",
+  "eq": "r = 1 + 0.4 cos(3 theta)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.14,
+  "secs": 3.1
+ },
+ {
+  "n": 4,
+  "name": "Flower",
+  "eq": "r = 1 + 0.5 cos(5 theta)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.181,
+  "secs": 3.1
+ },
+ {
+  "n": 5,
+  "name": "Limacon",
+  "eq": "r = 0.5 + cos(theta)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.159,
+  "secs": 3.0
+ },
+ {
+  "n": 6,
+  "name": "Cardioid",
+  "eq": "r = 1 + cos(theta)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.133,
+  "secs": 3.0
+ },
+ {
+  "n": 7,
+  "name": "Lemniscate",
+  "eq": "x = cos(t)/(1 + sin(t)^2), y = sin(t) cos(t)/(1 + sin(t)^2)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.11,
+  "secs": 1.8
+ },
+ {
+  "n": 8,
+  "name": "Teardrop",
+  "eq": "x = sin(t) sin(t/2), y = cos(t)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.121,
+  "secs": 3.0
+ },
+ {
+  "n": 9,
+  "name": "Astroid",
+  "eq": "x = cos(t)^3, y = sin(t)^3",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.125,
+  "secs": 3.3
+ },
+ {
+  "n": 10,
+  "name": "Deltoid",
+  "eq": "x = 2 cos(t) + cos(2 t), y = 2 sin(t) - sin(2 t)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.125,
+  "secs": 2.9
+ },
+ {
+  "n": 11,
+  "name": "Squircle",
+  "eq": "x^4 + y^4 = r^4",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.15,
+  "secs": 3.0
+ },
+ {
+  "n": 12,
+  "name": "Soft hex",
+  "eq": "x^6 + y^6 = r^6",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.156,
+  "secs": 3.4
+ },
+ {
+  "n": 13,
+  "name": "Hypotrochoid",
+  "eq": "x = 3 cos(t) + cos(3 t), y = 3 sin(t) - sin(3 t)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.125,
+  "secs": 3.4
+ },
+ {
+  "n": 14,
+  "name": "Lissajous 3:2",
+  "eq": "x = sin(3 t), y = sin(2 t)",
+  "warnings": [
+   "resin wall 0.55 mm < 0.6 mm"
+  ],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.293,
+  "secs": 3.2
+ },
+ {
+  "n": 15,
+  "name": "Figure eight",
+  "eq": "x = sin(t), y = sin(2 t)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.191,
+  "secs": 3.3
+ },
+ {
+  "n": 16,
+  "name": "Scalloped disc",
+  "eq": "r = 1 + 0.15 cos(12 theta)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.183,
+  "secs": 3.1
+ },
+ {
+  "n": 17,
+  "name": "Sun gear",
+  "eq": "r = 1 + 0.25 cos(8 theta)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.18,
+  "secs": 3.4
+ },
+ {
+  "n": 18,
+  "name": "Heart",
+  "eq": "x = 16 sin(t)^3, y = 13 cos(t) - 5 cos(2 t) - 2 cos(3 t) - cos(4 t)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.132,
+  "secs": 3.0
+ },
+ {
+  "n": 19,
+  "name": "Swirl",
+  "eq": "x = (1 + 0.6 cos(3 t)) cos(t + 1.2 sin(3 t)), y = (1 + 0.6 cos(3 t)) sin(t + 1.2 sin(3 t))",
+  "warnings": [
+   "resin wall 0.30 mm < 0.6 mm"
+  ],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.254,
+  "secs": 2.9
+ },
+ {
+  "n": 20,
+  "name": "Wavy oval",
+  "eq": "r = 1 + 0.2 cos(2 theta) + 0.1 cos(6 theta)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "clay_cm3": 0.117,
+  "secs": 2.6
+ }
+]
