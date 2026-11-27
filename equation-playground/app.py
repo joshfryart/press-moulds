@@ -13,6 +13,7 @@ import types
 import zipfile
 import geometry as geo
 import clay
+import anim
 
 EXAMPLES = {
     "explicit": "y = a sin(b x)",
@@ -81,6 +82,15 @@ def param_widgets(names):
                            on_change=_on_range, args=(n, "step"))
         vals[n] = s["v"]
     return vals
+
+
+def show_html(html, height):
+    # st.iframe replaces components.html in newer Streamlit
+    if hasattr(st, "iframe"):
+        st.iframe(html, height=height)
+    else:
+        import streamlit.components.v1 as components
+        components.html(html, height=height)
 
 
 # ---------- plotting ----------
@@ -207,6 +217,8 @@ with st.sidebar:
             domain[ax] = (d0, d1)
             st.warning(f"{ax}: min must be below max. Using default range {d0:g} to {d1:g}.")
     equal = st.checkbox("Equal aspect", value=True)
+    animate = st.checkbox("Animate changes", value=True,
+                          help="Morph smoothly from the previous plot to the new one.")
 
 # ---------- plot ----------
 try:
@@ -224,7 +236,31 @@ if res is None:
     st.stop()
 for w in res.warnings:
     st.warning(w)
-st.plotly_chart(make_figure(res, equal), width="stretch")
+prev = ss.get("shown_res")
+fig, animated = anim.morph_figure(lambda r: make_figure(r, equal), res, prev if animate else None)
+if animated:
+    show_html(anim.to_html(fig), 540)
+else:
+    st.plotly_chart(fig, width="stretch")
+ss["shown_res"] = res
+
+if spec.params:
+    with st.expander("Animate a parameter (drag the slider to watch it change live)"):
+        a1, a2, a3 = st.columns(3)
+        sweep_name = a1.selectbox("Parameter", spec.params, key="sweep_name")
+        sweep_steps = a2.slider("Frames", 10, 60, 30, key="sweep_steps")
+        show_sweep = a3.checkbox("Show sweep", key="sweep_on")
+        if show_sweep:
+            st0 = _store(sweep_name)
+            try:
+                sfig, nfr = anim.sweep_figure(lambda r: make_figure(r, equal), spec, pvals, domain,
+                                              int(min(n_samples, 400)), sweep_name,
+                                              st0["lo"], st0["hi"], sweep_steps)
+                show_html(anim.to_html(sfig, animated=False), 680)
+                st.caption(f"{nfr} frames, {sweep_name} from {st0['lo']:g} to {st0['hi']:g} "
+                           "(change the range in the sidebar).")
+            except ValueError as e:
+                st.warning(str(e))
 
 # ---------- make it ----------
 st.header("Make it")
