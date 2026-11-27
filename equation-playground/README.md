@@ -32,6 +32,10 @@ Sliders start at 1.0, range -5 to 5, step 0.01.
 - **Animate changes** (sidebar, on by default): any slider or equation change morphs smoothly from the old plot to the new one. Needs the same number of curve pieces before and after, otherwise it just redraws.
 - **Animate a parameter** (expander under the plot): tick *Show sweep*, pick a parameter, then press Play or drag the slider to watch the shape change live across the parameter's min to max range. Needs internet (loads Plotly from a CDN).
 
+## 3D model
+
+A live 3D preview of the pressed form sits under the settings, no Build needed. Drag to rotate, scroll to zoom, double-click to reset. It uses a coarse pixel so it stays fast; Build gives print quality. After a Build, the 3D preview also shows the mould, top half or lid.
+
 ## Make it
 
 - **Form type**: Full 3D (default) = bottom half + top half pressed together, piece domed both sides. Flat back = one mould + flat lid.

@@ -320,6 +320,34 @@ def placed(res):
     return types.SimpleNamespace(kind=res.kind, polylines=pl, closed=res.closed, X=None, Y=None, Z=None)
 
 
+# ---------- live 3D model (rotate with mouse, scroll to zoom) ----------
+st.subheader("3D model")
+if st.checkbox("Show 3D model (drag to rotate, scroll to zoom)", value=True, key="live3d_on"):
+    lpx = max(px, 0.2, size / 220.0)   # coarse pixel keeps it fast; Build gives print quality
+    lkey = json.dumps([ss["text"], pvals, domain, int(n_samples), vars(dataclasses.replace(form_opt, px=lpx)),
+                       rot, flip, two_sided], sort_keys=True, default=str)
+    if ss.get("live3d_key") != lkey:
+        try:
+            r3 = placed(res)
+            fo3 = dataclasses.replace(form_opt, px=lpx)
+            if r3.kind == "surface":
+                H3, _ = geo.surface_heightmap(r3.X, r3.Y, r3.Z, fo3)
+            else:
+                pairs = [(p, c) for p, c in zip(r3.polylines, list(r3.closed) + [False] * len(r3.polylines))
+                         if p is not None and len(p) >= 2]
+                pm = geo.fit_polylines([p for p, _ in pairs], fo3.size_mm)
+                H3, _ = geo.curve_heightmap(pm, [c for _, c in pairs], fo3)
+            ss["live3d"] = geo.form_mesh(H3, lpx, fo3.base_mm, two_sided=bool(two_sided))
+            ss["live3d_key"] = lkey
+            ss["live3d_err"] = None
+        except Exception as e:
+            ss["live3d_err"] = str(e) if isinstance(e, ValueError) else "Could not make the 3D model for these settings."
+    if ss.get("live3d_err"):
+        st.warning(ss["live3d_err"])
+    elif ss.get("live3d") is not None:
+        st.plotly_chart(mesh_figure(ss["live3d"], "Form preview (coarse; press Build for print quality)"),
+                        width="stretch", key="live3d_chart")
+
 bc = st.columns([1, 1, 3])
 do_draft = bc[0].button("Draft build", help="Fast look: 0.1 mm pixel. Not for printing.")
 do_final = bc[1].button("Build", type="primary", help="Print quality at the Pixel size set above.")

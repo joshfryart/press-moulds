@@ -70,3 +70,15 @@ def test_app_bad_equation_clean_message(tmp_path):
     assert not at.exception
     for e in at.error:
         assert "OverflowError" not in e.value and "int too large" not in e.value
+
+
+def test_app_live_3d_model(tmp_path):
+    from streamlit.testing.v1 import AppTest
+    for f in ("app.py", "core.py", "geometry.py", "clay.py", "anim.py"):
+        shutil.copy(ROOT / f, tmp_path / f)
+    at = AppTest.from_file(str(tmp_path / "app.py"), default_timeout=90).run()
+    assert not at.exception
+    mesh = at.session_state["live3d"]
+    assert mesh.is_watertight and len(mesh.faces) > 100
+    at.text_area[0].set_value("z = a sin(x) cos(y)").run()
+    assert not at.exception and at.session_state["live3d"].is_watertight
