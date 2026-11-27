@@ -177,7 +177,7 @@ try:
 except core.EquationError as e:
     err = str(e)
 except Exception as e:  # defensive: never crash the UI on bad input
-    err = f"could not parse: {e}"
+    err = "Could not read this equation. Check the syntax."
 if spec is None:
     spec = ss.get("last_spec")
 
@@ -201,7 +201,11 @@ with st.sidebar:
         k = f"dom_{spec.kind}_{ax}"
         lo = a.number_input(f"{ax} min", value=float(d0), key=k + "_lo", format="%.4g")
         hi = b.number_input(f"{ax} max", value=float(d1), key=k + "_hi", format="%.4g")
-        domain[ax] = (lo, hi) if hi > lo else (d0, d1)
+        if hi > lo:
+            domain[ax] = (lo, hi)
+        else:
+            domain[ax] = (d0, d1)
+            st.warning(f"{ax}: min must be below max. Using default range {d0:g} to {d1:g}.")
     equal = st.checkbox("Equal aspect", value=True)
 
 # ---------- plot ----------
@@ -212,7 +216,8 @@ except core.EquationError as e:
     st.error(str(e))
     res = ss.get("last_res")
 except Exception as e:
-    st.error(f"could not sample: {e}")
+    st.error("Could not plot this equation with these values. Try other parameters or ranges."
+             + (" (showing last good plot)" if ss.get("last_res") else ""))
     res = ss.get("last_res")
 
 if res is None:
@@ -299,7 +304,7 @@ if do_draft or do_final:
         except ValueError as e:
             st.error(str(e))
         except Exception as e:
-            st.error(f"build failed: {e}")
+            st.error("Build failed. Try a different size, pixel or wall setting.")
 
 b = ss.get("build")
 if b:
@@ -343,6 +348,8 @@ if b:
         st.markdown(f"**{cb['n']} balls of {cb['d_mm']:.1f} mm** per piece. "
                     f"Cavity {cb['cavity_mm3'] / 1000:.3f} cm3, clay {cb['clay_mm3'] / 1000:.3f} cm3, "
                     f"about {cb['grams']:.2f} g. Placement shows in this editor only, not in any STL.")
+        if cb.get("warning"):
+            st.warning(cb["warning"])
         if cb["share_err_pct"] > 15:
             st.caption(f"Ball zones uneven by up to {cb['share_err_pct']:.0f}%. Push clay toward thin areas.")
         if show_balls:
@@ -350,6 +357,9 @@ if b:
     except ValueError as e:
         cb = None
         st.warning(str(e))
+    except Exception:
+        cb = None
+        st.warning("Could not work out the clay balls for this form.")
 
     # ---------- cost ----------
     st.subheader("Cost")

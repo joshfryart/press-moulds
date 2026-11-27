@@ -2,19 +2,29 @@
 Editor aid only: nothing here goes into any STL."""
 import numpy as np
 
+MAX_AUTO_BALLS = 12
 DENSITY_G_CM3 = 1.7     # polymer clay, approximate
 
 
 def ball_diameter(volume_mm3):
-    return float((6.0 * volume_mm3 / np.pi) ** (1.0 / 3.0))
+    return float((6.0 * max(float(volume_mm3), 0.0) / np.pi) ** (1.0 / 3.0))
 
 
 def clay_balls(H, px, two_sided=False, extra_pct=15.0, n=0, max_d=7.0, seed=0):
     """H: form heightmap (mm), px: pixel size (mm).
     Returns dict: cavity_mm3 (exact form volume of ONE piece), clay_mm3 (with extra),
     grams, n, d_mm (every ball same diameter), balls [(x_mm, y_mm)] in heightmap coords
-    (x = column * px, y = row * px), share_err_pct (worst ball-zone volume error)."""
+    (x = column * px, y = row * px), share_err_pct (worst ball-zone volume error),
+    warning (str or None: balls bigger than max_d)."""
     H = np.asarray(H, float)
+    if not (np.isfinite(px) and px > 0):
+        raise ValueError("pixel size must be positive")
+    if not np.isfinite(extra_pct) or extra_pct <= -100:
+        raise ValueError("extra clay must be above -100%")
+    if not np.isfinite(max_d) or max_d <= 0:
+        raise ValueError("max ball diameter must be positive")
+    if H.size == 0 or not np.isfinite(H).all():
+        raise ValueError("empty form")
     cavity = float(H.sum()) * px * px * (2.0 if two_sided else 1.0)
     if cavity <= 0:
         raise ValueError("empty form")
@@ -26,12 +36,19 @@ def clay_balls(H, px, two_sided=False, extra_pct=15.0, n=0, max_d=7.0, seed=0):
         idx = np.random.default_rng(seed).choice(len(P), 6000, replace=False)
         P, w = P[idx], w[idx]
     w = w / w.sum()
-    if n <= 0:                                          # auto: balls <= max_d, and one per ~15 mm of form
+    n_auto = n <= 0
+    if n_auto:                                          # auto: balls <= max_d, and one per ~15 mm of form
         ext = float(max(np.ptp(P[:, 0]), np.ptp(P[:, 1])))
-        n = max(1, int(np.ceil(ext / 15.0)))
-        while ball_diameter(clay / n) > max_d and n < 12:
+        n = min(MAX_AUTO_BALLS, max(1, int(np.ceil(ext / 15.0))))
+        while ball_diameter(clay / n) > max_d and n < MAX_AUTO_BALLS:
             n += 1
     n = int(min(n, len(P)))
+    d_mm = ball_diameter(clay / n)
+    warning = None
+    if d_mm > max_d:
+        warning = (f"Balls are {d_mm:.1f} mm, over the {max_d:g} mm target"
+                   + (f" (auto mode stops at {MAX_AUTO_BALLS} balls)" if n_auto else "")
+                   + ". Set more balls by hand or use less clay.")
     # equal-volume zones: k-means with a per-zone bias (power diagram), so every ball is the same size
     rng = np.random.default_rng(seed)
     C = P[rng.choice(len(P), n, replace=False, p=w)]
@@ -55,5 +72,5 @@ def clay_balls(H, px, two_sided=False, extra_pct=15.0, n=0, max_d=7.0, seed=0):
         balls.append(tuple(float(v) for v in Q[((Q - C[k]) ** 2).sum(1).argmin()]))
     balls.sort(key=lambda b: (-b[1], b[0]))            # top to bottom, left to right
     return dict(cavity_mm3=cavity, clay_mm3=clay, grams=clay / 1000.0 * DENSITY_G_CM3, n=n,
-                d_mm=ball_diameter(clay / n), balls=balls,
+                d_mm=d_mm, warning=warning, balls=balls,
                 share_err_pct=float(np.abs(share * n - 1.0).max() * 100.0))

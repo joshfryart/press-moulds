@@ -3,6 +3,7 @@ slider parameters, and sample it to polylines or a surface grid. No UI, no mesh.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -46,7 +47,7 @@ _CONSTS = {"pi": sp.pi, "e": sp.E, "E": sp.E}
 _GLOBALS = {
     "__builtins__": {},
     "Integer": sp.Integer, "Float": sp.Float, "Rational": sp.Rational,
-    "Symbol": sp.Symbol, "Function": sp.Function,
+    "Symbol": sp.Symbol, "Function": sp.Function, "Pow": sp.Pow, "Mul": sp.Mul, "Add": sp.Add,
 }
 _TRANSFORMS = standard_transformations + (
     convert_xor, implicit_multiplication, implicit_application, function_exponentiation,
@@ -54,8 +55,21 @@ _TRANSFORMS = standard_transformations + (
 _UNICODE = {
     "π": "pi", "θ": "theta", "φ": "phi", "ϕ": "phi", "α": "alpha", "β": "beta",
     "ω": "omega", "λ": "lam", "μ": "mu", "σ": "sigma", "τ": "tau",
-    "²": "^2", "³": "^3", "×": "*", "·": "*", "⋅": "*", "−": "-", "–": "-", "÷": "/",
+    "²": "^2", "³": "^3", "⁄": "/", "×": "*", "·": "*", "⋅": "*", "−": "-", "–": "-", "÷": "/",
 }
+
+
+_FRACTIONS = {"½": "1/2", "⅓": "1/3", "⅔": "2/3", "¼": "1/4", "¾": "3/4", "⅕": "1/5",
+              "⅖": "2/5", "⅗": "3/5", "⅘": "4/5", "⅙": "1/6", "⅚": "5/6", "⅛": "1/8",
+              "⅜": "3/8", "⅝": "5/8", "⅞": "7/8"}
+_GREEK = set(_UNICODE.values()) | {
+    "gamma", "delta", "epsilon", "eta", "kappa", "nu", "xi", "rho", "psi", "chi", "zeta", "iota",
+    "alpha", "beta", "omega", "lam", "mu", "sigma", "tau", "phi", "theta"}
+_INVISIBLE = "\u200b\u200c\u200d\u200e\u200f\u2060\u2061\u2062\u2063\u2064\ufeff\u00ad"
+_BANNED_NAMES = re.compile(
+    r"\b(eval|exec|open|getattr|setattr|compile|globals|locals|vars|input|print|"
+    r"Symbol|Function|Integer|Float|Rational)\b")
+MAX_NUM_DIGITS = 300      # largest allowed magnitude of a constant power, in decimal digits
 
 
 @dataclass
@@ -87,6 +101,8 @@ class Result:
 def _check_safe(text: str) -> None:
     if len(text) > MAX_LEN:
         raise EquationError(f"equation too long (max {MAX_LEN} characters)")
+    if any(ch in _INVISIBLE for ch in text):
+        raise EquationError("not allowed in an equation: invisible character")
     low = text.lower()
     if "__" in text or "import" in low or "lambda" in low:
         raise EquationError("not allowed in an equation")
@@ -94,6 +110,8 @@ def _check_safe(text: str) -> None:
         raise EquationError("not allowed in an equation: attribute access")
     if re.search(r"[<>≤≥≠]|!=", text):
         raise EquationError("not supported: inequalities")
+    if _BANNED_NAMES.search(text):
+        raise EquationError("not allowed in an equation: " + _BANNED_NAMES.search(text).group(1))
     if "'" in text or '"' in text or re.search(r"\bd\s*/\s*d[a-z]", text):
         raise EquationError("not supported: derivatives / ODEs")
     if re.search(r"[\[\]{}@`$\\#]", text):
@@ -101,8 +119,20 @@ def _check_safe(text: str) -> None:
 
 
 def _normalise(text: str) -> str:
+    for k, v in _FRACTIONS.items():
+        text = re.sub(r"(?<=[\w)])" + k, "*(" + v + ")", text)
+        text = text.replace(k, "(" + v + ")")
     for k, v in _UNICODE.items():
         text = text.replace(k, v)
+    # sqrt sign: √x, √2, √(x+1), √sin(x)
+    text = re.sub(r"√\s*(\d+(?:\.\d+)?|[A-Za-z_]\w*(?!\w)(?!\s*\())", r"sqrt(\1)", text)
+    text = text.replace("√", "sqrt ")
+    # fullwidth / math-italic / etc. letters and digits -> ASCII
+    text = unicodedata.normalize("NFKC", text)
+    bad = next((ch for ch in text if ord(ch) > 127 and not ("\u0370" <= ch <= "\u03ff")), None)
+    if bad is not None:
+        raise EquationError(f"not supported: character {bad!r}")
+    _check_safe(text)          # NFKC can reveal e.g. fullwidth '<' or quotes
     # |u| -> abs(u) (non-nested bars only)
     text = re.sub(r"\|([^|]+)\|", r"abs(\1)", text)
     if "|" in text:
@@ -128,17 +158,75 @@ def _split_parts(text: str) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
+def _guard_size(tree) -> None:
+    """Reject constant powers whose value would be astronomically large, so that
+    evaluating them (9^9^9) can neither hang nor exhaust memory."""
+    for node in sp.preorder_traversal(tree):
+        if node.is_Pow:
+            b, ex = node.args
+            if b.free_symbols or ex.free_symbols:
+                if not ex.free_symbols and ex.is_number:
+                    try:
+                        if abs(float(sp.N(ex))) > 1e6:
+                            raise EquationError("number too large")
+                    except (TypeError, ValueError, OverflowError):
+                        raise EquationError("number too large")
+                continue
+            try:
+                eb, ee = abs(float(sp.N(b))), abs(float(sp.N(ex)))
+                digits = ee * np.log10(eb) if eb > 0 else 0.0
+            except (TypeError, ValueError, OverflowError):
+                raise EquationError("number too large")
+            if not np.isfinite(digits) or digits > MAX_NUM_DIGITS:
+                raise EquationError("number too large")
+        elif node.is_Integer and abs(int(node)) > 10 ** MAX_NUM_DIGITS:
+            raise EquationError("number too large")
+
+
+def _implicit_hint(name: str) -> str | None:
+    """Message if an unknown name looks like run-together multiplication (ax, sinx, xsin)."""
+    if not name.isalpha() or len(name) < 2 or name in _GREEK or name in _CONSTS:
+        return None
+    toks = sorted((f for f in _FUNCS if len(f) >= 3), key=len, reverse=True)
+
+    def split(w):
+        if not w:
+            return []
+        for f in toks:
+            if w.startswith(f):
+                r = split(w[len(f):])
+                if r is not None:
+                    return [f] + r
+        r = split(w[1:])
+        return None if r is None else [w[0]] + r
+    parts = split(name)
+    uses_func = parts is not None and any(len(t) > 1 for t in parts)
+    uses_axis = parts is not None and len(name) <= 3 and any(t in AXIS_NAMES for t in parts)
+    if uses_func or uses_axis:
+        return f"unknown name {name}: write '*' explicitly (e.g. a*x, x*sin(x)) or use sin(x)"
+    return None
+
+
 def _parse_expr(s: str) -> sp.Expr:
     if not s.strip():
         raise EquationError("missing expression on one side of '='")
+    if re.search(r"\b[Mm](in|ax)\s*\(\s*\)", s):
+        raise EquationError("min/max needs at least one argument")
     local = dict(_FUNCS)
     local.update(_CONSTS)
     local.update(_AX)
     try:
+        # first build the tree unevaluated so size can be checked before any arithmetic
+        tree = parse_expr(s, local_dict=local, global_dict=dict(_GLOBALS),
+                          transformations=_TRANSFORMS, evaluate=False)
+        if isinstance(tree, sp.Basic):
+            _guard_size(tree)
         e = parse_expr(s, local_dict=local, global_dict=dict(_GLOBALS),
                        transformations=_TRANSFORMS, evaluate=True)
     except EquationError:
         raise
+    except (OverflowError, MemoryError, RecursionError):
+        raise EquationError("number too large")
     except Exception:
         raise EquationError(f"could not parse: {s.strip()[:40]}")
     if isinstance(e, bool) or e in (sp.true, sp.false):
@@ -150,7 +238,14 @@ def _parse_expr(s: str) -> sp.Expr:
     undef = e.atoms(AppliedUndef)
     if undef:
         name = sorted(str(f.func) for f in undef)[0]
+        hint = _implicit_hint(name)
+        if hint:
+            raise EquationError(hint)
         raise EquationError(f"not supported: unknown function {name}()")
+    for nm in sorted(_names(e)):
+        hint = _implicit_hint(nm)
+        if hint:
+            raise EquationError(hint)
     if e.has(sp.I):
         raise EquationError("not supported: complex numbers")
     if e.has(sp.zoo, sp.oo, -sp.oo, sp.nan):
@@ -181,7 +276,10 @@ def parse(text: str) -> Spec:
         raise EquationError("enter an equation")
     if len(parts) > 2:
         raise EquationError("not supported: more than two equations")
-    parsed = [_parse_part(p) for p in parts]
+    try:
+        parsed = [_parse_part(p) for p in parts]
+    except (OverflowError, MemoryError):
+        raise EquationError("number too large")
 
     if len(parsed) == 2:
         sides = {}
@@ -226,6 +324,15 @@ def parse(text: str) -> Spec:
     return _make(text, "explicit", ["x"], [e], {"x": (-10.0, 10.0)}, f"y = {sp.latex(e)}")
 
 
+def _real_roots(e):
+    """x^(1/3), cbrt(x), x^(2/3) ... : use the real root for negative x (odd denominator)."""
+    def real(p):
+        r = p.exp
+        return sp.Abs(p.base) ** r * sp.sign(p.base) ** r.p
+    return e.replace(lambda p: p.is_Pow and p.exp.is_Rational and p.exp.q > 1 and p.exp.q % 2 == 1
+                     and not p.base.is_number, real)
+
+
 def _make(text, kind, axes, exprs, domain, tex) -> Spec:
     free = set()
     for e in exprs:
@@ -233,7 +340,9 @@ def _make(text, kind, axes, exprs, domain, tex) -> Spec:
     params = sorted(free - set(axes))
     syms = [_AX.get(a, sp.Symbol(a)) for a in axes] + [sp.Symbol(p) for p in params]
     try:
-        funcs = [sp.lambdify(syms, e, modules="numpy") for e in exprs]
+        funcs = [sp.lambdify(syms, _real_roots(e), modules="numpy") for e in exprs]
+    except (OverflowError, MemoryError):
+        raise EquationError("number too large")
     except Exception:
         raise EquationError("could not compile this equation")
     return Spec(text=text, kind=kind, params=params, defaults={p: 1.0 for p in params},
@@ -283,7 +392,9 @@ def _split_jumps_1d(y: np.ndarray, ymid: np.ndarray, breaks: np.ndarray) -> None
     flip = (y[:-1] * y[1:]) < 0
     avg = 0.5 * (y[:-1] + y[1:])
     off = ok & ~(np.abs(ymid - avg) <= span)          # midpoint far off the chord, or non-finite
-    breaks |= (big & flip) | off
+    # steps (floor, sign, ...): a jump far larger than typical, with the midpoint sitting on one side
+    step = ok & (dy > 5 * med + 1e-12 * span) & (np.abs(ymid - avg) > 0.3 * dy)
+    breaks |= (big & flip) | off | step
 
 
 def _split_jumps_2d(P: np.ndarray, breaks: np.ndarray) -> None:
@@ -325,7 +436,10 @@ def _merge_domain(spec: Spec, domain) -> dict[str, tuple[float, float]]:
     if domain:
         for k, v in domain.items():
             if k in d and v is not None:
-                lo, hi = float(v[0]), float(v[1])
+                try:
+                    lo, hi = float(v[0]), float(v[1])
+                except (TypeError, ValueError, IndexError, KeyError):
+                    raise EquationError(f"invalid range for {k}")
                 if not (np.isfinite(lo) and np.isfinite(hi)) or lo == hi:
                     raise EquationError(f"invalid range for {k}")
                 d[k] = (min(lo, hi), max(lo, hi))
@@ -343,7 +457,10 @@ def sample(spec: Spec, params: dict[str, float], domain: dict[str, tuple[float, 
             v = spec.defaults.get(p, 1.0)
         pv.append(v)
     dom = _merge_domain(spec, domain)
-    n = max(int(n), 2)
+    try:
+        n = max(int(n), 2)
+    except (TypeError, ValueError, OverflowError):
+        raise EquationError("invalid sample count")
     warns: list[str] = []
     X = Y = Z = None
     lines: list[np.ndarray] = []

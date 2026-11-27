@@ -17,6 +17,7 @@ MIN_GAP, MIN_FEATURE = 0.6, 1.0               # warning thresholds
 FORM_FACES, MOULD_FACES = 400_000, 600_000
 PIN_WALL = 1.0                                # resin around a pin socket, each side
 PIN_TIP_DEG = 30.0                            # pin tip chamfer, from the pin axis
+H_EPS = 1e-6                                  # mm; heights below this are rounding noise, treated as 0
 
 
 @dataclass
@@ -71,6 +72,36 @@ class HeightMap(np.ndarray):
         self.info = {}
 
 
+def _pos(name, v):
+    """v must be a finite number > 0 (a zero would give an empty / non-watertight / divide-by-zero build)."""
+    try:
+        ok = np.isfinite(v) and v > 0
+    except TypeError:
+        ok = False
+    if not ok:
+        raise ValueError("%s must be a number > 0 (got %r)" % (name, v))
+
+
+def _check_form_opt(opt):
+    for n in ("size_mm", "px", "strand_w", "strand_h"):
+        _pos(n, getattr(opt, n))
+    if opt.loop:
+        _pos("loop_h", opt.loop_h)
+
+
+def _check_mould_opt(opt):
+    _pos("wall", opt.wall)
+    _pos("chamfer", opt.chamfer)             # 0 leaves a degenerate bottom edge (not watertight)
+    if opt.pins:
+        _pos("pin_d", opt.pin_d)
+
+
+def _check_H(H, px):
+    _pos("px", px)
+    if not np.isfinite(np.asarray(H, float)).all():
+        raise ValueError("heightmap contains NaN or inf")
+
+
 # ---------------------------------------------------------------- 2D
 
 def fit_polylines(polylines, size_mm):
@@ -113,7 +144,8 @@ def to_svg(polylines_mm, stroke_mm=1.8):
 def _profile(d, r, h, tanw):
     """spiral_v2 strand profile: dome capped by the draft line, 0 outside."""
     q = np.clip(d / r, 0, 1)
-    return np.where(d < r, np.minimum(h * np.sqrt(1 - q * q), (r - d) * tanw), 0.0)
+    z = np.where(d < r, np.minimum(h * np.sqrt(1 - q * q), (r - d) * tanw), 0.0)
+    return np.where(z > H_EPS, z, 0.0)
 
 
 def _resample(p, step, closed):
@@ -160,11 +192,15 @@ def _hole_tangent(P, base, u, rh):
     Returns (centre, contact point) or None."""
     n = np.array([-u[1], u[0]])
     rel = P - base; s = rel @ u; lat = rel @ n
-    band = np.abs(lat) < rh
-    if not band.any():                       # line misses the form: slide it to the nearest form point
-        k = np.argmin(np.abs(lat) - 1e3 * (s > 0))
+    band = (np.abs(lat) < rh) & (s > 0)      # only form beyond the base point: the loop goes on the far side
+    if not band.any():                       # nothing there: slide the line to the far end of the form
+        far = s > 0 if (s > 0).any() else np.ones(len(s), bool)
+        cand = np.nonzero(far & (s >= s[far].max() - rh))[0]
+        k = cand[np.argmin(np.abs(lat[cand]))]
         base = base + lat[k] * n; rel = P - base; s = rel @ u; lat = rel @ n
-        band = np.abs(lat) < rh
+        band = (np.abs(lat) < rh) & (s > 0)
+        if not band.any():
+            band = np.abs(lat) < rh
     t = s[band] + np.sqrt(np.maximum(rh * rh - lat[band] ** 2, 0))
     k = np.argmax(t)
     return base + u * t[k], P[np.nonzero(band)[0][k]]
@@ -208,6 +244,7 @@ def _add_loop(Hs, x0, y0, px, opt, tanw):
 
 
 def curve_heightmap(polylines_mm, closed, opt: FormOptions):
+    _check_form_opt(opt)
     px = opt.px; r = opt.strand_w / 2; tanw = np.tan(np.radians(90 - opt.draft_deg))
     if opt.loop and not (0 < opt.loop_id < opt.loop_od - 0.8):
         raise ValueError("loop hole must be smaller than loop outer dia - 0.8 mm")
@@ -245,6 +282,7 @@ def curve_heightmap(polylines_mm, closed, opt: FormOptions):
 
 
 def surface_heightmap(X, Y, Z, opt: FormOptions):
+    _check_form_opt(opt)
     px = opt.px; tanw = np.tan(np.radians(90 - opt.draft_deg))
     X = np.asarray(X, float); Y = np.asarray(Y, float); Z = np.asarray(Z, float)
     xa, ya = X[0, :], Y[:, 0]
@@ -331,7 +369,9 @@ def _finish(V, F, target):
 
 def form_mesh(H, px, base_mm=0.0, two_sided=False):
     """Positive form. Flat back at z=0, or with two_sided a solid mirrored about z=0 (base_mm ignored)."""
+    _check_H(H, px)
     H = np.pad(np.asarray(H, float), 1)
+    H = np.where(H > H_EPS, H, 0.0)
     if base_mm > 0 and not two_sided:        # flat plate under the form: one grid solid
         V, F = _grid_solid(H + base_mm, px, min(0.3, base_mm / 2))
         return _finish(V, F, FORM_FACES)
@@ -472,6 +512,7 @@ def _pin_z(dist, d, pin_h, px):
 
 def mould_mesh(H, opt: MouldOptions, px):
     info_in = getattr(H, "info", {}) or {}
+    _check_mould_opt(opt); _check_H(H, px)
     H, org = _crop(np.asarray(H, float), (0.0, 0.0), px, opt.pad)
     hole_rc = None
     if "loop_ctr_px" in info_in:
@@ -572,7 +613,10 @@ def _thinnest(mask, px, r_max_mm, frac=0.6):
             return False
         lab, n = ndimage.label(lost, structure=np.ones((3, 3)))
         mx = ndimage.maximum(ndimage.distance_transform_edt(lost), lab, np.arange(1, n + 1))
-        return bool(np.max(mx) >= max(frac * r, 1.5))
+        cnt = ndimage.sum(lost, lab, np.arange(1, n + 1))
+        big = mx >= max(frac * r, 1.5)
+        thin = (mx >= min(1.5, r)) & (cnt >= 6 * r)     # 1-2 px wide strip (0.1-0.2 mm): long, not a corner sliver
+        return bool(np.any(big | thin))
     # ascending scan (a whole thin feature is only recognised near r = w/2), then bisect
     lo, hi, r = 0.5, None, 1.0
     while r <= r_max_mm / px:
@@ -594,6 +638,7 @@ def check(H, px, form, mould, two_sided=None):
     if two_sided is None:
         two_sided = bool(minfo.get("two_sided", False))
     k2 = 2 if two_sided else 1
+    _check_H(H, px)
     H = np.asarray(H, float); M = H > 0
     warnings = []
     _, bodies = ndimage.label(M)
@@ -607,8 +652,8 @@ def check(H, px, form, mould, two_sided=None):
     Mp = np.pad(M, k3)[::k, ::k]
     feat = _thinnest(Mp, pc, 3.0) if len(xs) else None
     gap = _thinnest(~Mp, pc, 1.5)
-    if feat is None:
-        feat = 6.0
+    if feat is None and len(xs):
+        feat = 6.0                            # nothing removed by opening radii up to 3 mm: every part is >= 6 mm wide
     tilt = None
     if "loop_ctr_px" in hinfo and len(xs):
         r, c = hinfo["loop_ctr_px"]; com = _com(H, 0, 0, 1)
@@ -633,7 +678,7 @@ def check(H, px, form, mould, two_sided=None):
         warnings.append("form is %d separate pieces" % bodies)
     if gap is not None and gap < MIN_GAP:
         warnings.append("resin wall %.2f mm < %.1f mm" % (gap, MIN_GAP))
-    if feat < MIN_FEATURE:
+    if feat is not None and feat < MIN_FEATURE:
         warnings.append("feature %.2f mm < %.1f mm" % (feat, MIN_FEATURE))
     if "loop_od" in hinfo:
         rw = (hinfo["loop_od"] - hinfo["loop_id"]) / 2
@@ -658,6 +703,7 @@ def check(H, px, form, mould, two_sided=None):
 # ---------------------------------------------------------------- all in one
 
 def build_all(result, form_opt, mould_opt):
+    _check_form_opt(form_opt); _check_mould_opt(mould_opt)
     px = form_opt.px
     two = bool(getattr(mould_opt, "two_sided", False))
     if result.kind == "surface":
