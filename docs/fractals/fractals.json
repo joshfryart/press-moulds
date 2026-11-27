@@ -1,0 +1,504 @@
+[
+ {
+  "n": 1,
+  "name": "Koch snowflake",
+  "family": "Fourier fractal",
+  "kind": "parametric",
+  "eq": "x = sin(t) - 0.09 sin(5 t) + 0.097 sin(7 t) + 0.035 sin(11 t) - 0.035 sin(17 t) - 0.011 sin(23 t) + 0.02 sin(25 t) + 0.019 sin(31 t) + 0.012 sin(47 t) - 0.013 sin(65 t), y = cos(t) + 0.09 cos(5 t) + 0.097 cos(7 t) - 0.035 cos(11 t) + 0.035 cos(17 t) + 0.011 cos(23 t) + 0.02 cos(25 t) + 0.019 cos(31 t) - 0.012 cos(47 t) + 0.013 cos(65 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "level-3 Koch snowflake, first 10 harmonics (1, 5, 7, 11 ... 31)",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 0.7,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   27.9,
+   35.1,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.233
+ },
+ {
+  "n": 2,
+  "name": "Cesaro torn square",
+  "family": "Fourier fractal",
+  "kind": "parametric",
+  "eq": "x = cos(t) - 0.223 cos(3 t) - 0.251 cos(5 t) - 0.07 cos(7 t) - 0.099 cos(11 t) + 0.031 cos(13 t) + 0.066 cos(17 t) - 0.131 cos(21 t) - 0.026 cos(25 t) + 0.017 cos(27 t) - 0.018 cos(29 t) - 0.031 cos(43 t), y = -sin(t) - 0.223 sin(3 t) + 0.251 sin(5 t) - 0.07 sin(7 t) - 0.099 sin(11 t) - 0.031 sin(13 t) - 0.066 sin(17 t) + 0.131 sin(21 t) + 0.026 sin(25 t) + 0.017 sin(27 t) + 0.018 sin(29 t) - 0.031 sin(43 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "Cesaro fractal (80 deg, level 2) on a square, 12 harmonics",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 1.01,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   32.9,
+   1.5
+  ],
+  "hang_tilt_deg": -0.0,
+  "clay_cm3": 0.449
+ },
+ {
+  "n": 3,
+  "name": "Cesaro cross",
+  "family": "Fourier fractal",
+  "kind": "parametric",
+  "eq": "x = cos(t) - 0.219 cos(3 t) - 0.166 cos(5 t) - 0.044 cos(7 t) - 0.066 cos(11 t) + 0.012 cos(13 t) + 0.016 cos(15 t) + 0.034 cos(17 t) - 0.039 cos(21 t) - 0.013 cos(31 t) - 0.01 cos(35 t) - 0.016 cos(43 t) + 0.009 cos(65 t) - 0.012 cos(85 t), y = -sin(t) - 0.219 sin(3 t) + 0.166 sin(5 t) - 0.044 sin(7 t) - 0.066 sin(11 t) - 0.012 sin(13 t) + 0.016 sin(15 t) - 0.034 sin(17 t) + 0.039 sin(21 t) - 0.013 sin(31 t) - 0.01 sin(35 t) - 0.016 sin(43 t) - 0.009 sin(65 t) + 0.012 sin(85 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "Cesaro fractal (60 deg, level 3), 14 harmonics",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 0.93,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   31.7,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.321
+ },
+ {
+  "n": 4,
+  "name": "Sierpinski curve",
+  "family": "Fourier fractal",
+  "kind": "parametric",
+  "eq": "x = sin(t) - 0.226 sin(3 t) + 0.265 sin(5 t) + 0.094 sin(7 t) + 0.01 sin(9 t) - 0.133 sin(11 t) - 0.023 sin(13 t) + 0.032 sin(17 t) + 0.036 sin(21 t) + 0.016 sin(27 t) + 0.009 sin(31 t) + 0.009 sin(43 t), y = cos(t) + 0.226 cos(3 t) + 0.265 cos(5 t) - 0.094 cos(7 t) + 0.01 cos(9 t) + 0.133 cos(11 t) - 0.023 cos(13 t) + 0.032 cos(17 t) + 0.036 cos(21 t) - 0.016 cos(27 t) - 0.009 cos(31 t) - 0.009 cos(43 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "closed Sierpinski curve order 2, 12 harmonics",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 0.93,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   35.1,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.264
+ },
+ {
+  "n": 5,
+  "name": "Sierpinski curve, order 3",
+  "family": "Fourier fractal",
+  "kind": "parametric",
+  "eq": "x = sin(t) - 0.225 sin(3 t) + 0.275 sin(5 t) + 0.095 sin(7 t) - 0.143 sin(11 t) - 0.029 sin(13 t) + 0.053 sin(17 t) + 0.107 sin(21 t) + 0.031 sin(27 t) + 0.025 sin(31 t) + 0.021 sin(39 t) - 0.067 sin(43 t), y = cos(t) + 0.225 cos(3 t) + 0.275 cos(5 t) - 0.095 cos(7 t) + 0.143 cos(11 t) - 0.029 cos(13 t) + 0.053 cos(17 t) + 0.107 cos(21 t) - 0.031 cos(27 t) - 0.025 cos(31 t) - 0.021 cos(39 t) + 0.067 cos(43 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "closed Sierpinski curve order 3, 12 harmonics: too dense for 30 mm",
+  "warnings": [
+   "resin wall 0.55 mm < 0.6 mm"
+  ],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 0.55,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   35.1,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.399
+ },
+ {
+  "n": 6,
+  "name": "Minkowski island",
+  "family": "Fourier fractal",
+  "kind": "parametric",
+  "eq": "x = .066cos(t)+.998sin(t)+.162cos(3t)-.029sin(3t)-.179cos(5t)+.098sin(5t)-.126cos(7t)-.034sin(7t)+.05cos(9t)+.002sin(9t)-.01cos(11t)+.027sin(11t)+.031cos(13t)+.044sin(13t)+.022cos(19t)-.011sin(19t)-.02cos(37t)-.014sin(37t)-.015cos(39t)+.018sin(39t), y = -.066sin(t)+.998cos(t)+.162sin(3t)+.029cos(3t)+.179sin(5t)+.098cos(5t)-.126sin(7t)+.034cos(7t)-.05sin(9t)+.002cos(9t)-.01sin(11t)-.027cos(11t)-.031sin(13t)+.044cos(13t)+.022sin(19t)+.011cos(19t)+.02sin(37t)-.014cos(37t)-.015sin(39t)-.018cos(39t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "quadratic Koch (Minkowski sausage) island level 2, 10 harmonics, chiral",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 1.38,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   34.1,
+   1.5
+  ],
+  "hang_tilt_deg": -0.0,
+  "clay_cm3": 0.275
+ },
+ {
+  "n": 7,
+  "name": "Pentaflake",
+  "family": "Fourier fractal",
+  "kind": "parametric",
+  "eq": "x = sin(t) - 0.126 sin(4 t) + 0.161 sin(6 t) + 0.049 sin(9 t) - 0.054 sin(14 t) + 0.043 sin(21 t) + 0.061 sin(26 t) - 0.017 sin(31 t) - 0.014 sin(54 t), y = cos(t) + 0.126 cos(4 t) + 0.161 cos(6 t) - 0.049 cos(9 t) + 0.054 cos(14 t) + 0.043 cos(21 t) + 0.061 cos(26 t) - 0.017 cos(31 t) + 0.014 cos(54 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "inward 72 deg Cesaro on a pentagon, level 2, 9 harmonics",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 1.38,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   33.8,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.283
+ },
+ {
+  "n": 8,
+  "name": "Moore curve",
+  "family": "Fourier fractal",
+  "kind": "parametric",
+  "eq": "x = .925cos(t)-.568cos(3t)-.159cos(5t)-.048cos(7t)-.078cos(9t)+.073cos(11t)+.085cos(13t)-.081cos(15t)-.058cos(17t)+.035cos(19t)+.013cos(23t)+.025cos(29t)-.02cos(31t)+.018cos(33t)-.017cos(35t), y = 1.075sin(t)-.085sin(3t)-.064sin(5t)+.184sin(7t)+.13sin(9t)+.041sin(11t)+.115sin(13t)-.047sin(15t)+.032sin(17t)-.035sin(19t)-.013sin(23t)-.025sin(29t)+.02sin(31t)+.018sin(33t)-.017sin(35t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "closed Hilbert (Moore) curve order 3, harmonics up to 35",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 1.82,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   35.1,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.396
+ },
+ {
+  "n": 9,
+  "name": "Snow crystal",
+  "family": "Epicycle nest",
+  "kind": "parametric",
+  "eq": "x = sin(t) - 0.45 sin(5 t) + 0.1 sin(19 t), y = cos(t) + 0.45 cos(5 t) + 0.1 cos(19 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "3 epicycles, speeds 1, -5, 19",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 0.7,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   27.8,
+   35.1,
+   1.5
+  ],
+  "hang_tilt_deg": -0.0,
+  "clay_cm3": 0.253
+ },
+ {
+  "n": 10,
+  "name": "Compass star",
+  "family": "Epicycle nest",
+  "kind": "parametric",
+  "eq": "x = cos(t) + 0.3 cos(7 t) + 0.08 cos(17 t), y = sin(t) - 0.3 sin(7 t) + 0.08 sin(17 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "3 epicycles, speeds 1, -7, 17",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 0.76,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   35.1,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.231
+ },
+ {
+  "n": 11,
+  "name": "Diamond lantern",
+  "family": "Epicycle nest",
+  "kind": "parametric",
+  "eq": "x = cos(t) + 0.6 cos(3 t) + 0.15 cos(9 t), y = sin(t) - 0.6 sin(3 t) + 0.15 sin(9 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "3 epicycles, speeds 1, -3, 9",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 1.82,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   35.1,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.182
+ },
+ {
+  "n": 12,
+  "name": "Fern snowflake",
+  "family": "Polar harmonics",
+  "kind": "polar",
+  "eq": "r = 1 - 0.3 cos(6 theta) + 0.1 cos(18 theta) - 0.03 cos(30 theta)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "6-fold polar harmonics 6, 18, 30",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 1.82,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   30.2,
+   34.8,
+   1.5
+  ],
+  "hang_tilt_deg": -0.0,
+  "clay_cm3": 0.223
+ },
+ {
+  "n": 13,
+  "name": "Rose in rose in rose",
+  "family": "Polar harmonics",
+  "kind": "polar",
+  "eq": "r = (1 + 0.3 sin(5 theta)) (1 - 0.1 sin(15 theta)) (1 + 0.03 sin(45 theta))",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "5-petal rose modulated by 15- and 45-petal roses",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 1.63,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   33.7,
+   1.5
+  ],
+  "hang_tilt_deg": -0.0,
+  "clay_cm3": 0.21
+ },
+ {
+  "n": 14,
+  "name": "Takagi rosette",
+  "family": "Polar harmonics",
+  "kind": "polar",
+  "eq": "r = 1 + 0.12 (acos(cos(6 theta)) + acos(cos(12 theta))/2 + acos(cos(24 theta))/4)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "3 terms of the Takagi (blancmange) series wrapped on a circle",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 1.89,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   29.7,
+   34.6,
+   1.5
+  ],
+  "hang_tilt_deg": -0.0,
+  "clay_cm3": 0.189
+ },
+ {
+  "n": 15,
+  "name": "Woven spirograph",
+  "family": "Spirograph",
+  "kind": "parametric",
+  "eq": "x = (1 + 0.4 cos(7 t)) cos(3 t), y = (1 + 0.4 cos(7 t)) sin(3 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "7 lobes over 3 turns",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 1.56,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.3,
+   34.9,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.366
+ },
+ {
+  "n": 16,
+  "name": "Lissajous clover",
+  "family": "Lissajous",
+  "kind": "parametric",
+  "eq": "x = cos(3 t) + 0.25 cos(9 t), y = sin(2 t) - 0.35 sin(6 t)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "3:2 Lissajous with third harmonics",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 0.7,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   29.5,
+   32.7,
+   1.5
+  ],
+  "hang_tilt_deg": -0.0,
+  "clay_cm3": 0.323
+ },
+ {
+  "n": 17,
+  "name": "Sierpinski triangle",
+  "family": "Implicit",
+  "kind": "implicit",
+  "eq": "max(-y-4.3, y/2+0.866x-4.3, y/2-0.866x-4.3)*max(y-2.15, -y/2+0.866x-2.15, -y/2-0.866x-2.15)*max((y-4.3)-1.075, -(y-4.3)/2+0.866x-1.075, -(y-4.3)/2-0.866x-1.075)*max((y+2.15)-1.075, -(y+2.15)/2+0.866(x-3.724)-1.075, -(y+2.15)/2-0.866(x-3.724)-1.075)*max((y+2.15)-1.075, -(y+2.15)/2+0.866(x+3.724)-1.075, -(y+2.15)/2-0.866(x+3.724)-1.075) = 0",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "level-2 Sierpinski triangle: product of 5 triangle outlines",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 1.47,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   31.1,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.297
+ },
+ {
+  "n": 18,
+  "name": "Ring gasket",
+  "family": "Implicit",
+  "kind": "implicit",
+  "eq": "(x^2+y^2-81)*(x^2+(y-4.82)^2-18.5)*((x-4.175)^2+(y+2.41)^2-18.5)*((x+4.175)^2+(y+2.41)^2-18.5)*(x^2+(y+6.9)^2-6.76)*((x-5.975)^2+(y-3.45)^2-6.76)*((x+5.975)^2+(y-3.45)^2-6.76)*(x^2+y^2-0.09) = 0",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "Apollonian-style circle packing, circles overlapped so tangent slivers close",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 0.7,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   30.8,
+   35.1,
+   1.5
+  ],
+  "hang_tilt_deg": -0.0,
+  "clay_cm3": 0.358
+ },
+ {
+  "n": 19,
+  "name": "Two-scale lattice",
+  "family": "Implicit",
+  "kind": "implicit",
+  "eq": "cos(x) cos(y) + 0.5 cos(2 x) cos(2 y) = 0.3 + (x^2 + y^2)^4/50000000",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "lattice at two scales, closed off by a radial term",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 0.76,
+  "min_feature_mm": 1.74,
+  "bodies": 1,
+  "form_mm": [
+   31.7,
+   35.1,
+   1.5
+  ],
+  "hang_tilt_deg": 0.0,
+  "clay_cm3": 0.41
+ },
+ {
+  "n": 20,
+  "name": "Fractal quilt medallion",
+  "family": "Surface relief",
+  "kind": "surface",
+  "eq": "z = abs(sin(x) sin(y)) + abs(sin(2 x) sin(2 y))/2 + abs(sin(4 x) sin(4 y))/4 + 0.0001 sqrt(24.5 - x^2 - y^2) + 0.0001 sqrt(x^2 + (y - 4.1)^2 - 0.12)",
+  "size_mm": 30,
+  "sliders": [],
+  "note": "3-octave relief on a disc; the sqrt terms cut the disc edge and a 2 mm hanging hole",
+  "warnings": [],
+  "watertight": [
+   true,
+   true
+  ],
+  "min_gap_mm": 2.12,
+  "min_feature_mm": 1.82,
+  "bodies": 1,
+  "form_mm": [
+   30.1,
+   30.1,
+   2.99
+  ],
+  "hang_tilt_deg": null,
+  "clay_cm3": 1.232
+ }
+]
