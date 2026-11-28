@@ -5,7 +5,7 @@ flat back, drafted walls, so no undercuts by construction), the mould block is a
 the heightmap cut into its top face plus flash gutter, vents and relief pockets, bottom edge chamfered.
 All lengths in mm. Heightmap H[i, j] sits at (x0 + j*px, y0 + i*px), rows run with +y (y up).
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import numpy as np
 from scipy import ndimage
 from scipy.spatial import cKDTree
@@ -17,6 +17,9 @@ MIN_GAP, MIN_FEATURE = 0.6, 1.0               # warning thresholds
 FORM_FACES, MOULD_FACES = 400_000, 600_000
 PIN_WALL = 1.0                                # resin around a pin socket, each side
 PIN_TIP_DEG = 30.0                            # pin tip chamfer, from the pin axis
+MIN_DRAFT = 3.0                               # deg; below this a hand-pressed clay piece may stick in the resin
+MIN_FITTED_MM = 3.0                           # fitted centreline width / height below this is a hairline
+MAX_BUILD_GB = 6.0                            # refuse builds estimated above this (conservative on a 16 GB box)
 H_EPS = 1e-6                                  # mm; heights below this are rounding noise, treated as 0
 
 
@@ -85,6 +88,9 @@ def _pos(name, v):
 def _check_form_opt(opt):
     for n in ("size_mm", "px", "strand_w", "strand_h"):
         _pos(n, getattr(opt, n))
+    d = opt.draft_deg
+    if not (isinstance(d, (int, float, np.floating, np.integer)) and np.isfinite(d) and 0 <= d < 90):
+        raise ValueError("draft_deg must be a number from 0 to <90 (got %r)" % (d,))
     if opt.loop:
         _pos("loop_h", opt.loop_h)
 
@@ -100,6 +106,36 @@ def _check_H(H, px):
     _pos("px", px)
     if not np.isfinite(np.asarray(H, float)).all():
         raise ValueError("heightmap contains NaN or inf")
+
+
+def estimate_build_gb(size_mm, px, two_sided=False, pins=False):
+    """Peak memory (GB) of build_all for a pair block (the larger case) of a form fitted to size_mm.
+    Calibrated on measured runs: ~1.2 KB per block cell (30 mm @0.05 = 2.1-2.9 GB, 60 mm @0.05 = 6.0 GB,
+    30 mm @0.03 = 6.6 GB), slightly pessimistic."""
+    _pos("size_mm", size_mm); _pos("px", px)
+    cells = (2 * size_mm + 33) * (size_mm + 24) / (px * px)
+    return 0.4 + 1.1e-6 * cells * (1 + 0.1 * bool(two_sided) + 0.05 * bool(pins))
+
+
+def _min_px(gb_fn, px, budget):
+    """Smallest pixel (rounded up to 0.01 mm) at which gb_fn(px) fits the budget."""
+    p = px
+    while gb_fn(p) > budget and p < 100:
+        p = max(p * 1.05, p + 0.005)
+    return np.ceil(p * 100 - 1e-9) / 100
+
+
+def _too_fine(gb, px, gb_fn, budget):
+    return ValueError("too fine for this size: needs about %.1f GB, use pixel >= %.2f mm"
+                      % (gb, _min_px(gb_fn, px, budget)))
+
+
+def _check_grid(nx, ny, px):
+    """Guard the heightmap allocation itself (~0.45 KB per cell over the whole build of the form)."""
+    f = lambda p: 0.4 + 0.45e-6 * nx * ny * (px / p) ** 2
+    gb = f(px)
+    if gb > MAX_BUILD_GB:
+        raise _too_fine(gb, px, f, MAX_BUILD_GB)
 
 
 # ---------------------------------------------------------------- 2D
@@ -248,6 +284,9 @@ def curve_heightmap(polylines_mm, closed, opt: FormOptions):
     px = opt.px; r = opt.strand_w / 2; tanw = np.tan(np.radians(90 - opt.draft_deg))
     if opt.loop and not (0 < opt.loop_id < opt.loop_od - 0.8):
         raise ValueError("loop hole must be smaller than loop outer dia - 0.8 mm")
+    clamped = None
+    if opt.loop and opt.loop_shift_mm < 0:   # a hole sunk into the form cuts a near-vertical wall (no draft)
+        clamped = opt.loop_shift_mm; opt = replace(opt, loop_shift_mm=0.0)
     closed = list(closed) + [False] * (len(polylines_mm) - len(closed))
     lines = [_resample(p, px / 2, c) for p, c in zip(polylines_mm, closed) if len(p) >= 2]
     if not lines:
@@ -257,6 +296,8 @@ def curve_heightmap(polylines_mm, closed, opt: FormOptions):
     if opt.loop:
         pad += opt.loop_od + max(opt.loop_shift_mm, 0) + 0.5
     lo = allp.min(0) - pad; hi = allp.max(0) + pad
+    nx, ny = int((hi[0] - lo[0]) / px) + 2, int((hi[1] - lo[1]) / px) + 2
+    _check_grid(nx, ny, px)
     xs = np.arange(lo[0], hi[0] + px, px); ys = np.arange(lo[1], hi[1] + px, px)
     nx, ny = len(xs), len(ys)
     # only query pixels near the centreline: rasterise points and dilate
@@ -274,9 +315,11 @@ def curve_heightmap(polylines_mm, closed, opt: FormOptions):
     if opt.loop and H.max() > 0:
         H, ctr = _add_loop(H, x0, y0, px, opt, tanw)
     Hc, org = _crop(H, (x0, y0), px, 0.5)
-    info = {}
+    info = dict(draft_deg=opt.draft_deg, strand_w=opt.strand_w, strand_h=opt.strand_h)
+    if clamped is not None:
+        info["loop_shift_clamped"] = clamped
     if ctr is not None:
-        info = dict(loop_ctr_px=((ctr[1] - org[1]) / px, (ctr[0] - org[0]) / px),
+        info.update(loop_ctr_px=((ctr[1] - org[1]) / px, (ctr[0] - org[0]) / px),
                     loop_od=opt.loop_od, loop_id=opt.loop_id)
     return HeightMap(Hc, info), org
 
@@ -296,6 +339,7 @@ def surface_heightmap(X, Y, Z, opt: FormOptions):
     span = max(bx1 - bx0, by1 - by0)
     s = opt.size_mm / span if span > 0 else 1.0
     w, h = (bx1 - bx0) * s, (by1 - by0) * s
+    _check_grid(int(w / px) + 2, int(h / px) + 2, px)
     u = np.arange(0, w + px / 2, px); v = np.arange(0, h + px / 2, px)
     dx = (xa[-1] - xa[0]) / max(len(xa) - 1, 1); dy = (ya[-1] - ya[0]) / max(len(ya) - 1, 1)
     fj = (bx0 + u / s - xa[0]) / (dx if dx else 1); fi = (by0 + v / s - ya[0]) / (dy if dy else 1)
@@ -312,7 +356,7 @@ def surface_heightmap(X, Y, Z, opt: FormOptions):
     e = ndimage.distance_transform_edt(Hp > 0)[1:-1, 1:-1] * px
     H = np.minimum(H, e * tanw)
     Hc, org = _crop(H, (-w / 2, -h / 2), px, 0.5)
-    return HeightMap(Hc), org
+    return HeightMap(Hc, dict(draft_deg=opt.draft_deg)), org
 
 
 # ---------------------------------------------------------------- meshes
@@ -351,7 +395,9 @@ def _finish(V, F, target):
     Falls back to milder simplification if the result is not a clean closed solid."""
     T = V[F]
     vol0 = float(np.einsum("ij,ij->i", T[:, 0], np.cross(T[:, 1], T[:, 2])).sum() / 6)
-    tries = [target, int(target * 1.5), len(F)] if len(F) > target else [len(F)]
+    # simplification occasionally collapses two vertices onto the same spot and the merge then pinches
+    # an edge; a slightly different target usually avoids it, so try a few before giving up
+    tries = [target, int(target * 0.85), int(target * 1.15), int(target * 1.5), len(F)] if len(F) > target else [len(F)]
     tm = None
     for t in tries:
         if t < len(F):
@@ -363,7 +409,9 @@ def _finish(V, F, target):
         if tm.volume < 0:
             tm.invert()
         if tm.is_watertight and tm.volume > 0 and abs(tm.volume - abs(vol0)) < 0.01 * abs(vol0) + 1e-6:
-            return tm
+            break
+    tm.metadata["simplify"] = dict(target=int(target), faces=int(len(tm.faces)), input_faces=int(len(F)),
+                                   fell_back=bool(len(F) > target and len(tm.faces) > 1.5 * target))
     return tm
 
 
@@ -522,6 +570,10 @@ def mould_mesh(H, opt: MouldOptions, px):
     T = float(H.max()) + opt.wall
     warnings = []
     margin = opt.margin
+    if opt.two_sided and not opt.pins:
+        warnings.append("two-sided without pins: no registration between the halves")
+    if opt.wall < 2.0 and not opt.pins:
+        warnings.append("wall %.1f mm < 2 mm without pins: thin block (%.1f mm) may flex" % (opt.wall, T))
     if opt.pins:
         need = opt.pin_d + 1.0 + 2 * opt.pin_clear + 2 * PIN_WALL
         if margin < need:
@@ -566,7 +618,7 @@ def mould_mesh(H, opt: MouldOptions, px):
     mesh.metadata["mould_info"] = dict(
         st, vents=len(vents), pins=3 if opt.pins else 0, two_sided=bool(opt.two_sided), warnings=warnings,
         T=T, px=px, chamfer=opt.chamfer, shape=(BY, BX), margin=margin, sockets=sockets, pins_xy=pins2,
-        pin_h=opt.pin_h, top_Z=(T - Dt[:, ::-1]) if opt.two_sided else None)
+        pin_h=opt.pin_h, wall=opt.wall, top_Z=(T - Dt[:, ::-1]) if opt.two_sided else None)
     return mesh
 
 
@@ -634,7 +686,23 @@ def _thinnest(mask, px, r_max_mm, frac=0.6):
     return round((2 * hi - 0.5) * px, 2)
 
 
-def check(H, px, form, mould, two_sided=None):
+def _mesh_faces(m):
+    return None if m is None else int(len(m.faces))
+
+
+def _simplify_warning(name, m, cap):
+    sm = (getattr(m, "metadata", None) or {}).get("simplify")
+    if sm and sm["fell_back"]:
+        return "%s simplification fell back to %d faces (target %d): the STL will be very large" % (name, sm["faces"], sm["target"])
+    if m is not None and len(m.faces) > 1.5 * cap:
+        return "%s has %d faces (cap %d): the STL will be very large" % (name, len(m.faces), cap)
+    return None
+
+
+def check(H, px, form, mould, two_sided=None, lid=None, centreline_mm=None):
+    """Printability report. form_mm is the finished piece (pixel extent of H > 0, so it includes the strand
+    width and any loop: about one strand width more than the centreline size_mm). centreline_mm = (w, h) of
+    the fitted centreline, when known, enables the hairline / extreme aspect warning."""
     hinfo = getattr(H, "info", {}) or {}
     minfo = (getattr(mould, "metadata", None) or {}).get("mould_info", {}) if mould is not None else {}
     if two_sided is None:
@@ -665,6 +733,9 @@ def check(H, px, form, mould, two_sided=None):
         min_feature_mm=feat, min_gap_mm=gap,
         form_watertight=None if form is None else bool(form.is_watertight),
         mould_watertight=None if mould is None else bool(mould.is_watertight),
+        lid_watertight=None if lid is None else bool(lid.is_watertight),
+        form_faces=_mesh_faces(form), mould_faces=_mesh_faces(mould), lid_faces=_mesh_faces(lid),
+        centreline_mm=None if centreline_mm is None else [round(float(v), 2) for v in centreline_mm],
         block_mm=None, resin_ml=None,
         enclosed_gaps=minfo.get("enclosed_gaps"), pockets=minfo.get("pockets"),
         vents=minfo.get("vents"), pins=minfo.get("pins", 0), two_sided=bool(two_sided),
@@ -686,6 +757,22 @@ def check(H, px, form, mould, two_sided=None):
             warnings.append("loop ring wall %.2f mm < 0.8 mm" % rw)
         if hinfo["loop_id"] < 1.2:
             warnings.append("loop hole %.2f mm < 1.2 mm" % hinfo["loop_id"])
+    d = hinfo.get("draft_deg")
+    if d is not None and d < MIN_DRAFT:
+        warnings.append("draft %.1f deg < %.0f deg: %s" % (d, MIN_DRAFT, "no draft, the clay will grip the resin walls"
+                                                          if d <= 0 else "walls may grip the clay on release"))
+    if "strand_h" in hinfo:
+        reach = min(hinfo["strand_h"], hinfo["strand_w"] / 2 * np.tan(np.radians(90 - hinfo["draft_deg"])))
+        info["strand_reach_mm"] = round(float(reach), 2)
+        if reach < hinfo["strand_h"] - 0.05:
+            warnings.append("strand height reaches only %.2f mm of the requested %.2f mm (draft %.0f deg on a %.2f mm strand)"
+                            % (reach, hinfo["strand_h"], hinfo["draft_deg"], hinfo["strand_w"]))
+    if "loop_shift_clamped" in hinfo:
+        warnings.append("loop shift %.1f mm clamped to 0: sinking the loop into the form would cut a near-vertical wall"
+                        % hinfo["loop_shift_clamped"])
+    if centreline_mm is not None and min(centreline_mm) < MIN_FITTED_MM and len(xs):
+        warnings.append("fitted shape is only %.2f x %.2f mm (extreme aspect ratio): the form is a hairline or flat strip"
+                        % (centreline_mm[0], centreline_mm[1]))
     if tilt is not None and abs(tilt) > 5:
         warnings.append("hangs tilted %.0f deg" % tilt)
     warnings += list(minfo.get("warnings", []))
@@ -696,19 +783,38 @@ def check(H, px, form, mould, two_sided=None):
             warnings.append("mould STL is not watertight")
         elif len(mould.split(only_watertight=False)) > 1:
             warnings.append("mould STL has more than one body")
+    if lid is not None and not lid.is_watertight:
+        warnings.append("lid STL is not watertight")
+    for nm, m, cap in (("form", form, FORM_FACES), ("mould", mould, MOULD_FACES), ("lid", lid, MOULD_FACES)):
+        w = _simplify_warning(nm, m, cap)
+        if w:
+            warnings.append(w)
     info["warnings"] = warnings
     return info
 
 
 # ---------------------------------------------------------------- all in one
 
-def build_all(result, form_opt, mould_opt):
+def build_all(result, form_opt, mould_opt, fit=True, max_gb=None):
+    """fit=True: polylines are scaled so the centreline bbox's largest side is form_opt.size_mm (the finished
+    piece is about one strand width larger, see check()['form_mm']). fit=False: polylines are already in mm
+    at final size and are used as they are (no scaling; position is irrelevant). Raises ValueError when the
+    estimated memory (estimate_build_gb) exceeds max_gb (default MAX_BUILD_GB)."""
     _check_form_opt(form_opt); _check_mould_opt(mould_opt)
     px = form_opt.px
-    two = bool(getattr(mould_opt, "two_sided", False))
+    two = bool(getattr(mould_opt, "two_sided", False)); pins = bool(getattr(mould_opt, "pins", False))
+    budget = MAX_BUILD_GB if max_gb is None else max_gb
+    cl_mm = None
+
+    def guard(size):
+        gb = estimate_build_gb(size, px, two, pins)
+        if gb > budget:
+            raise _too_fine(gb, px, lambda p: estimate_build_gb(size, p, two, pins), budget)
+
     if result.kind == "surface":
         if result.Z is None or not np.isfinite(np.asarray(result.Z, float)).any():
             raise ValueError("nothing to build: surface is empty")
+        guard(form_opt.size_mm)
         H, _ = surface_heightmap(result.X, result.Y, result.Z, form_opt)
         svg = None
     else:
@@ -718,11 +824,18 @@ def build_all(result, form_opt, mould_opt):
         if not pairs:
             raise ValueError("nothing to build: no curve")
         closed = [c for _, c in pairs]
-        pm = fit_polylines([p for p, _ in pairs], form_opt.size_mm)
+        if fit:
+            pm = fit_polylines([p for p, _ in pairs], form_opt.size_mm)
+        else:
+            pm = [np.asarray(p, float) for p, _ in pairs]
+        allp = np.vstack(pm); ext = allp.max(0) - allp.min(0)
+        cl_mm = (float(ext[0]), float(ext[1]))
+        guard(max(float(ext.max()), 1e-3))
         svg = to_svg(pm, form_opt.strand_w)
         H, _ = curve_heightmap(pm, closed, form_opt)
     form = form_mesh(H, px, form_opt.base_mm, two_sided=two)
     mould = mould_mesh(H, mould_opt, px)
     lid = lid_mesh(mould, mould_opt)
     return {"svg": svg, "form": form, "mould": mould, "lid": lid,
-            "check": check(H, px, form, mould, two_sided=two), "H": H, "two_sided": two}
+            "check": check(H, px, form, mould, two_sided=two, lid=lid, centreline_mm=cl_mm),
+            "H": H, "two_sided": two}
