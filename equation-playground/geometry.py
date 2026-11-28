@@ -605,8 +605,9 @@ def stl_bytes(mesh):
 def _thinnest(mask, px, r_max_mm, frac=0.6):
     """Opening test: smallest disk radius whose opening removes a whole feature (not just corner
     slivers). Returns width in mm or None if nothing is removed up to r_max_mm."""
+    D = ndimage.distance_transform_edt(mask)
     def removes(r):
-        E = ndimage.distance_transform_edt(mask) > r
+        E = D > r
         O = ndimage.distance_transform_edt(~E) <= r
         lost = mask & ~O
         if not lost.any():
@@ -622,14 +623,15 @@ def _thinnest(mask, px, r_max_mm, frac=0.6):
     while r <= r_max_mm / px:
         if removes(r):
             hi = r; break
-        lo = r; r = max(r * 1.2, r + 0.5)
+        lo = r; r = max(r * 1.35, r + 0.5)
     if hi is None:
         return None
-    while hi - lo > 0.25:
+    while hi - lo > 0.1:
         mid = (lo + hi) / 2
         if removes(mid): hi = mid
         else: lo = mid
-    return round((2 * hi + 1) * px, 2)        # +1 px: EDT counts to the first outside pixel centre
+    # a strip n px wide has EDT peak ceil(n/2) px, and vanishes at r = peak: n = 2r - 1 (odd) or 2r (even)
+    return round((2 * hi - 0.5) * px, 2)
 
 
 def check(H, px, form, mould, two_sided=None):
@@ -645,13 +647,11 @@ def check(H, px, form, mould, two_sided=None):
     ys, xs = np.nonzero(M)
     form_mm = [round(float((xs.max() - xs.min() + 1) * px), 1), round(float((ys.max() - ys.min() + 1) * px), 1),
                round(float(H.max()) * k2, 2)] if len(xs) else [0.0, 0.0, 0.0]
-    # opening tests at <= 0.1 mm pixels for speed
-    k = max(1, int(round(0.1 / px))) if px < 0.1 else 1
-    pc = px * k
+    # opening tests at the true pixel size (subsampling made 0.5-0.6 mm gaps read 0.7+)
     k3 = int(np.ceil(3.0 / px)) + 2
-    Mp = np.pad(M, k3)[::k, ::k]
-    feat = _thinnest(Mp, pc, 3.0) if len(xs) else None
-    gap = _thinnest(~Mp, pc, 1.5)
+    Mp = np.pad(M, k3)
+    feat = _thinnest(Mp, px, 3.0) if len(xs) else None
+    gap = _thinnest(~Mp, px, 1.5)
     if feat is None and len(xs):
         feat = 6.0                            # nothing removed by opening radii up to 3 mm: every part is >= 6 mm wide
     tilt = None
