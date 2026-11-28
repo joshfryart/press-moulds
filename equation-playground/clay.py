@@ -3,19 +3,25 @@ Editor aid only: nothing here goes into any STL."""
 import numpy as np
 
 MAX_AUTO_BALLS = 12
-DENSITY_G_CM3 = 1.7     # polymer clay, approximate
+DENSITY_G_CM3 = 1.35    # polymer clay, approximate (default)
+CLAY_TYPES = {          # approximate densities, g/cm3; weigh a ball to correct
+    "Polymer clay (about 1.35 g/cm3)": 1.35,
+    "Low-fire earthenware (about 1.7 g/cm3)": 1.7,
+}
 
 
 def ball_diameter(volume_mm3):
     return float((6.0 * max(float(volume_mm3), 0.0) / np.pi) ** (1.0 / 3.0))
 
 
-def clay_balls(H, px, two_sided=False, extra_pct=15.0, n=0, max_d=7.0, seed=0):
+def clay_balls(H, px, two_sided=False, extra_pct=15.0, n=0, max_d=7.0, seed=0,
+               base_mm=0.0, density=None):
     """H: form heightmap (mm), px: pixel size (mm).
     Returns dict: cavity_mm3 (exact form volume of ONE piece), clay_mm3 (with extra),
     grams, n, d_mm (every ball same diameter), balls [(x_mm, y_mm)] in heightmap coords
     (x = column * px, y = row * px), share_err_pct (worst ball-zone volume error),
-    warning (str or None: balls bigger than max_d)."""
+    warning (str or None: balls bigger than max_d). base_mm (one-sided only) adds a flat plate
+    under the whole grid: base_mm3 is returned and counted in cavity/clay. density in g/cm3."""
     H = np.asarray(H, float)
     if not (np.isfinite(px) and px > 0):
         raise ValueError("pixel size must be positive")
@@ -28,6 +34,10 @@ def clay_balls(H, px, two_sided=False, extra_pct=15.0, n=0, max_d=7.0, seed=0):
     cavity = float(H.sum()) * px * px * (2.0 if two_sided else 1.0)
     if cavity <= 0:
         raise ValueError("empty form")
+    base_mm3 = 0.0
+    if base_mm and base_mm > 0 and not two_sided:
+        base_mm3 = float(H.shape[0] * H.shape[1]) * px * px * float(base_mm)
+        cavity += base_mm3
     clay = cavity * (1.0 + extra_pct / 100.0)
     ys, xs = np.nonzero(H > 0)
     w = H[ys, xs]
@@ -71,6 +81,7 @@ def clay_balls(H, px, two_sided=False, extra_pct=15.0, n=0, max_d=7.0, seed=0):
         Q = P[lab == k] if (lab == k).any() else P
         balls.append(tuple(float(v) for v in Q[((Q - C[k]) ** 2).sum(1).argmin()]))
     balls.sort(key=lambda b: (-b[1], b[0]))            # top to bottom, left to right
-    return dict(cavity_mm3=cavity, clay_mm3=clay, grams=clay / 1000.0 * DENSITY_G_CM3, n=n,
+    return dict(cavity_mm3=cavity, clay_mm3=clay, grams=clay / 1000.0 * (DENSITY_G_CM3 if density is None else float(density)), n=n,
+                base_mm3=base_mm3,
                 d_mm=d_mm, warning=warning, balls=balls,
                 share_err_pct=float(np.abs(share * n - 1.0).max() * 100.0))

@@ -7,6 +7,7 @@ import streamlit as st
 
 import core
 import dataclasses
+import inspect
 import io
 import pathlib
 import types
@@ -239,9 +240,32 @@ for w in res.warnings:
 # ---------- main view: 3D (default) or 2D ----------
 top = st.container()
 
+PRESS_GUIDE = """
+**Polymer clay (STAEDTLER FIMO Soft)**
+- Dust the mould lightly with cornstarch, or wet it with water. Chill the clay and the mould for 10-15 minutes first.
+- Press firmly, trim the flash flat with a blade across the land, then pop the piece out of the resin mould **before baking**.
+  Printed resin may soften at baking temperature (untested).
+- Bake at **110 C / 230 F**, never above 130 C / 265 F, for 30 minutes per 6 mm of thickness. Check with an oven thermometer.
+  Bake on a tile and tent with foil. Ventilate. Do not use food trays.
+- Use strand height 2.0 mm for polymer clay.
+- Shrinkage compensation is not needed for polymer clay. (Earthenware shrinks about 6.4 percent in total: scale up by about 1.07.)
+
+**Printing the mould**
+- Wash printed resin in isopropyl alcohol and post-cure it fully before it touches clay.
+- Tilt the plate 30-45 deg when printing to reduce layer lines on the cavity face.
+"""
+
+
 # ---------- make it ----------
 st.header("Make it")
+with st.expander("How to press and release"):
+    st.markdown(PRESS_GUIDE)
 c1, c2, c3 = st.columns(3)
+with c3:
+    st.subheader("Mould")
+    two_sided = st.radio("Form type", ["Full 3D (two halves)", "Flat back (mould + lid)"],
+                         help="Full 3D: bottom + top half pressed together, piece domed both sides. "
+                              "Flat back: one mould, flat lid.").startswith("Full")
 with c1:
     st.subheader("Form")
     size = st.number_input("Size (mm)", 5.0, 200.0, 40.0, step=1.0)
@@ -251,7 +275,13 @@ with c1:
     px = st.number_input("Pixel (mm)", 0.02, 0.2, 0.05, step=0.01, format="%.3f")
 with c2:
     st.subheader("Form extras")
-    loop = st.checkbox("Hanging loop", value=True)
+    is_surface = res.kind == "surface"
+    if is_surface:
+        st.info("Surface height is normalised to Relief; amplitude only changes the shape, not the height.")
+    loop = st.checkbox("Hanging loop", value=True, disabled=is_surface)
+    if is_surface:
+        st.caption("No hanging loop is built for surface kinds.")
+    loop = bool(loop) and not is_surface
     loop_auto = st.checkbox("Loop auto (top, over centre of mass)", value=True, disabled=not loop)
     loop_angle = st.slider("Loop position (deg, 0 right, 90 top)", 0.0, 360.0, 90.0, step=1.0,
                            disabled=(not loop) or loop_auto)
@@ -261,20 +291,22 @@ with c2:
     loop_h = st.number_input("Loop height (mm)", 0.5, 10.0, 1.5, step=0.1, disabled=not loop)
     rot = st.slider("Rotate shape (deg)", -180.0, 180.0, 0.0, step=1.0, help="2D kinds. Turns the shape before the loop is placed.")
     flip = st.checkbox("Mirror shape left-right", value=False)
-    relief = st.number_input("Relief (mm, surface)", 0.5, 20.0, 3.0, step=0.5)
-    base = st.number_input("Base plate (mm)", 0.0, 5.0, 0.0, step=0.2)
+    relief = st.number_input("Relief (mm, surface)", 0.5, 20.0, 3.0, step=0.5, disabled=not is_surface,
+                             help="Height of the surface kind. Ignored for curves (use Strand height).")
+    base = st.number_input("Base plate (mm)", 0.0, 5.0, 0.0, step=0.2, disabled=two_sided,
+                           help="Flat plate under the form. Ignored in Full 3D (two halves).")
+    if two_sided:
+        st.caption("Base plate is ignored in Full 3D mode.")
 with c3:
-    st.subheader("Mould")
     pair = st.checkbox("Pair (L + mirrored R)", value=True)
     wall = st.number_input("Floor wall (mm)", 1.0, 15.0, 3.0, step=0.5)
-    margin = st.number_input("Margin (mm)", 1.0, 20.0, 6.5, step=0.5, help="Pins need 6.3 or more.")
-    lid_t = st.number_input("Lid thickness (mm)", 1.0, 15.0, 5.0, step=0.5)
+    margin = st.number_input("Margin (mm)", 1.0, 20.0, 6.5, step=0.5,
+                             help="With pins on, grown automatically to 6.3 mm if smaller.")
+    lid_t = st.number_input("Lid thickness (mm)", 1.0, 15.0, 5.0, step=0.5, disabled=two_sided,
+                            help="Flat-back lid only. Ignored in Full 3D (the top half is a mirrored mould).")
     overflow = st.checkbox("Overflow gutter + vent lines", value=True)
     vents = st.number_input("Vent lines per cavity", 0, 12, 4, step=1)
     pockets = st.checkbox("Relief pockets in enclosed gaps", value=True)
-    two_sided = st.radio("Form type", ["Full 3D (two halves)", "Flat back (mould + lid)"],
-                         help="Full 3D: bottom + top half pressed together, piece domed both sides. "
-                              "Flat back: one mould, flat lid.").startswith("Full")
     pins = st.checkbox("Alignment pins", value=two_sided, key=f"pins_{two_sided}",
                        help="3 pins on the lid / top half, sockets in the mould. One pin oversize.")
 
@@ -287,14 +319,41 @@ mould_opt = geo.MouldOptions(wall=wall, margin=margin, pair=pair, lid_t=lid_t, o
 key = json.dumps([ss["text"], pvals, domain, int(n_samples), vars(form_opt), vars(mould_opt), rot, flip],
                  sort_keys=True, default=str)
 
-def placed(res):
-    """Result with rotate / mirror applied (2D kinds only)."""
-    if res.kind == "surface" or (rot == 0 and not flip):
+def placed(res, fit=False):
+    """Result with rotate / mirror applied (2D kinds only). With fit=True the curve is first
+    fitted to size_mm, then rotated / mirrored, so rotation never rescales the piece."""
+    if res.kind == "surface" or (rot == 0 and not flip and not fit):
         return res
+    cl = list(res.closed or [])
+    cl += [False] * (len(res.polylines) - len(cl))
+    pairs = [(p, c) for p, c in zip(res.polylines, cl) if p is not None and len(p) >= 2]
+    pl = [p for p, _ in pairs]
+    if fit:
+        pl = geo.fit_polylines(pl, size)
     c, s_ = np.cos(np.radians(rot)), np.sin(np.radians(rot))
     R = np.array([[c, -s_], [s_, c]])
-    pl = [(p * ([-1, 1] if flip else [1, 1])) @ R.T for p in res.polylines]
-    return types.SimpleNamespace(kind=res.kind, polylines=pl, closed=res.closed, X=None, Y=None, Z=None)
+    pl = [(p * ([-1, 1] if flip else [1, 1])) @ R.T for p in pl]
+    return types.SimpleNamespace(kind=res.kind, polylines=pl, closed=[c_ for _, c_ in pairs],
+                                 X=None, Y=None, Z=None)
+
+
+_HAS_FIT = "fit" in inspect.signature(geo.build_all).parameters
+MEM_BUDGET_GB = 8.0
+
+
+def mem_guard(bpx):
+    """Error text if the build would likely run out of memory, else None."""
+    est = getattr(geo, "estimate_build_gb", None)
+    if est is None:
+        return None
+    try:
+        gb = float(est(size, bpx, bool(two_sided), bool(pins)))
+    except Exception:
+        return None
+    if gb > MEM_BUDGET_GB:
+        return (f"This build needs about {gb:.1f} GB of memory (limit {MEM_BUDGET_GB:g} GB). "
+                "Increase Pixel or reduce Size.")
+    return None
 
 
 with top:
@@ -302,19 +361,21 @@ with top:
                          label_visibility="collapsed",
                          help="3D: the pressed form, drag to rotate, scroll to zoom. 2D: the equation plot.")
     if view_mode == "3D model":
-        lpx = max(px, 0.2, size / 220.0)   # coarse pixel keeps it fast; Build gives print quality
+        # coarse pixel keeps it fast, but keep the strand >= ~5 px wide when feasible; grid capped near 250 x 250
+        lpx = max(px, size / 250.0, min(max(px, 0.2, size / 220.0), sw / 5.0))
         lkey = json.dumps([ss["text"], pvals, domain, int(n_samples), vars(dataclasses.replace(form_opt, px=lpx)),
                            rot, flip, two_sided], sort_keys=True, default=str)
         if ss.get("live3d_key") != lkey:
             try:
-                r3 = placed(res)
+                r3 = placed(res, fit=_HAS_FIT)
                 fo3 = dataclasses.replace(form_opt, px=lpx)
                 if r3.kind == "surface":
                     H3, _ = geo.surface_heightmap(r3.X, r3.Y, r3.Z, fo3)
                 else:
                     pairs = [(p, c) for p, c in zip(r3.polylines, list(r3.closed) + [False] * len(r3.polylines))
                              if p is not None and len(p) >= 2]
-                    pm = geo.fit_polylines([p for p, _ in pairs], fo3.size_mm)
+                    pl3 = [p for p, _ in pairs]
+                    pm = pl3 if _HAS_FIT else geo.fit_polylines(pl3, fo3.size_mm)
                     H3, _ = geo.curve_heightmap(pm, [c for _, c in pairs], fo3)
                 ss["live3d"] = geo.form_mesh(H3, lpx, fo3.base_mm, two_sided=bool(two_sided))
                 ss["live3d_key"] = lkey
@@ -362,16 +423,22 @@ if do_draft or do_final:
         try:
             bpx = max(px, 0.1) if do_draft else px
             fo = dataclasses.replace(form_opt, px=bpx)
-            out = geo.build_all(placed(res), fo, mould_opt)
+            guard = mem_guard(bpx)
+            if guard:
+                raise MemoryError(guard)
+            if _HAS_FIT:
+                out = geo.build_all(placed(res, fit=True), fo, mould_opt, fit=False)
+            else:
+                out = geo.build_all(placed(res), fo, mould_opt)
             ss["build"] = dict(
-                key=key, svg=out.get("svg"), check=out["check"], H=out["H"], px=bpx, draft=do_draft,
+                key=key, base_mm=float(fo.base_mm), svg=out.get("svg"), check=out["check"], H=out["H"], px=bpx, draft=do_draft,
                 form_stl=geo.stl_bytes(out["form"]), mould_stl=geo.stl_bytes(out["mould"]),
                 lid_stl=geo.stl_bytes(out["lid"]), form=out["form"], mould=out["mould"], lid=out["lid"],
                 two_sided=bool(out.get("two_sided")), pair=bool(pair),
                 design=dict(equation=ss["text"], params=pvals, domain=domain, rotate_deg=rot, mirror=flip,
                             form=vars(fo), mould=vars(mould_opt)),
             )
-        except ValueError as e:
+        except (ValueError, MemoryError) as e:
             st.error(str(e))
         except Exception as e:
             st.error("Build failed. Try a different size, pixel or wall setting.")
@@ -412,12 +479,19 @@ if b:
                             help="Over the exact cavity volume. Goes to overflow lines.")
     nballs = k2.number_input("Balls per piece (0 = auto)", 0, 12, 0, step=1)
     show_balls = k3.checkbox("Show ball placement", value=True)
+    clay_type = st.selectbox("Clay type (for grams)", list(clay.CLAY_TYPES), key="clay_type",
+                             help="Approximate densities. Weigh one ball to correct.")
+    dens = clay.CLAY_TYPES[clay_type]
     try:
         cb = clay.clay_balls(b["H"], b["px"], two_sided=b.get("two_sided", False),
-                             extra_pct=extra, n=int(nballs))
+                             extra_pct=extra, n=int(nballs), density=dens,
+                             base_mm=0.0 if b.get("two_sided") else float(b.get("base_mm", 0.0)))
         st.markdown(f"**{cb['n']} balls of {cb['d_mm']:.1f} mm** per piece. "
                     f"Cavity {cb['cavity_mm3'] / 1000:.3f} cm3, clay {cb['clay_mm3'] / 1000:.3f} cm3, "
                     f"about {cb['grams']:.2f} g. Placement shows in this editor only, not in any STL.")
+        if cb.get("base_mm3"):
+            st.caption(f"Includes base plate: {cb['base_mm3'] / 1000:.3f} cm3 of clay "
+                       f"({b['base_mm']:g} mm over the whole form rectangle).")
         if cb.get("warning"):
             st.warning(cb["warning"])
         if cb["share_err_pct"] > 15:
@@ -460,7 +534,7 @@ if b:
             "Material cost per piece": f"{clay_cost + mould_share:.3f}",
             "Material cost per pair": f"{2 * (clay_cost + mould_share):.3f}",
         })
-        st.caption("Clay grams use density 1.7 g/cm3 (approximate). Weigh one ball to correct. "
+        st.caption(f"Clay grams use density {dens:g} g/cm3 (approximate, {clay_type.split(' (')[0].lower()}). Weigh one ball to correct. "
                    "Excludes findings, glaze, power, time.")
 
     part2 = "Top half" if b.get("two_sided") else "Lid"

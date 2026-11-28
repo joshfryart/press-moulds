@@ -59,7 +59,7 @@ SVG (2D kinds), form STL, mould STL, top half or lid STL. Or one zip with all pl
 
 ## Clay
 
-Exact cavity volume from the heightmap, plus extra % (default 15). Given as N equal balls with diameter in mm for calipers. Placement map shows where each ball goes. Editor only, never in any STL. Grams use 1.7 g/cm3 (approximate).
+Exact cavity volume from the heightmap, plus extra % (default 15). Given as N equal balls with diameter in mm for calipers. Placement map shows where each ball goes. Editor only, never in any STL. Grams use the Clay type density (polymer clay about 1.35, earthenware about 1.7 g/cm3, approximate). A base plate (one-sided only) is added to the clay volume.
 
 ## Cost
 
@@ -78,3 +78,13 @@ Enter clay price paid + grams bought, resin price paid + ml bought, presses per 
 - No inequalities. No ODEs or derivatives.
 - `f(x)` means `f*x`. `f` becomes a slider.
 - Complex values are not drawn.
+
+## Pressing and releasing (polymer clay, FIMO Soft)
+
+Also in the app under Make it > "How to press and release".
+
+- Dust the mould with cornstarch or wet it with water. Chill clay and mould 10-15 min. Press firmly, trim flash flat.
+- Pop the piece out of the resin mould **before baking** (printed resin may soften at baking temperature).
+- Bake at 110 C / 230 F, never above 130 C / 265 F, 30 min per 6 mm. Use an oven thermometer, bake on a tile, tent with foil, ventilate, no food trays.
+- Wash printed resin in isopropyl alcohol and post-cure fully. Print the plate tilted 30-45 deg to reduce layer lines on the cavity face.
+- Use strand height 2.0 mm for polymer clay. Shrinkage compensation is not needed (earthenware shrinks about 6.4 percent, scale about 1.07).
