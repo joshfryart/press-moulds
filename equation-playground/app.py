@@ -13,6 +13,7 @@ import pathlib
 import types
 import zipfile
 import geometry as geo
+import texture
 import clay
 import anim
 
@@ -273,6 +274,22 @@ with c1:
     sh = st.number_input("Strand height (mm)", 0.3, 10.0, 1.2, step=0.1)
     draft = st.number_input("Draft (deg)", 0.0, 45.0, 20.0, step=1.0)
     px = st.number_input("Pixel (mm)", 0.02, 0.2, 0.05, step=0.01, format="%.3f")
+    st.subheader("Raised texture")
+    tex_name = st.selectbox("Pattern", ["None"] + [k.capitalize() for k in texture.KINDS], key="tex_kind",
+                            help="Slightly raised pattern on top of the strand to catch paint and light. "
+                                 "Shows best on wide strands (try 4-6 mm) and on surface kinds.")
+    tex_on = tex_name != "None"
+    tex_height = st.slider("Texture height (mm)", 0.02, 1.0, 0.15, step=0.01, disabled=not tex_on,
+                           help="How far the pattern rises above the surface. 0.1-0.3 is subtle.")
+    tex_pitch = st.slider("Spacing (mm)", 0.3, 5.0, 0.8, step=0.05, disabled=not tex_on,
+                          help="Centre-to-centre distance. Below 0.3 mm will not print or press cleanly.")
+    tex_feature = st.slider("Feature size", 0.1, 1.0, 0.5, step=0.05, disabled=not tex_on,
+                            help="How much of each cell the raised feature fills (bigger = fatter, denser).")
+    tex_angle = st.slider("Pattern angle (deg)", -90.0, 90.0, 0.0, step=1.0, disabled=not tex_on)
+    tex_seed = st.number_input("Random seed (stipple)", 0, 9999, 1, step=1,
+                               disabled=not (tex_on and tex_name == "Stipple"))
+    if tex_on and sw < 3.0 and res.kind != "surface":
+        st.caption("Tip: the strand is %.1f mm wide, so the texture is tiny. Try Strand width 4-6 mm." % sw)
 with c2:
     st.subheader("Form extras")
     is_surface = res.kind == "surface"
@@ -313,7 +330,10 @@ with c3:
 form_opt = geo.FormOptions(size_mm=size, strand_w=sw, strand_h=sh, draft_deg=draft, px=px,
                            loop=loop, relief_mm=relief, base_mm=base,
                            loop_auto=loop_auto, loop_angle_deg=loop_angle, loop_shift_mm=loop_shift,
-                           loop_od=loop_od, loop_id=loop_id, loop_h=loop_h)
+                           loop_od=loop_od, loop_id=loop_id, loop_h=loop_h,
+                           tex_kind=(tex_name.lower() if tex_on else ""), tex_height=tex_height,
+                           tex_pitch=tex_pitch, tex_feature=tex_feature, tex_angle=tex_angle,
+                           tex_seed=int(tex_seed))
 mould_opt = geo.MouldOptions(wall=wall, margin=margin, pair=pair, lid_t=lid_t, overflow=overflow,
                              vents=int(vents), pockets=pockets, two_sided=two_sided, pins=pins)
 key = json.dumps([ss["text"], pvals, domain, int(n_samples), vars(form_opt), vars(mould_opt), rot, flip],
@@ -363,6 +383,8 @@ with top:
     if view_mode == "3D model":
         # coarse pixel keeps it fast, but keep the strand >= ~5 px wide when feasible; grid capped near 250 x 250
         lpx = max(px, size / 250.0, min(max(px, 0.2, size / 220.0), sw / 5.0))
+        if tex_on:    # resolve the pattern: at least ~6 pixels per spacing, never finer than the grid cap
+            lpx = max(px, size / 250.0, min(lpx, tex_pitch / 6.0))
         lkey = json.dumps([ss["text"], pvals, domain, int(n_samples), vars(dataclasses.replace(form_opt, px=lpx)),
                            rot, flip, two_sided], sort_keys=True, default=str)
         if ss.get("live3d_key") != lkey:

@@ -11,6 +11,7 @@ from scipy import ndimage
 from scipy.spatial import cKDTree
 import trimesh
 import fast_simplification
+import texture as tex
 
 VENT_W = 1.2                                  # vent width (spiral_v2 vent_w)
 MIN_GAP, MIN_FEATURE = 0.6, 1.0               # warning thresholds
@@ -39,6 +40,12 @@ class FormOptions:
     loop_auto: bool = True          # top of form, over centre of mass x
     loop_angle_deg: float = 90.0    # loop_auto False: direction from centre of mass, 0 right, 90 top, CCW
     loop_shift_mm: float = 0.0      # + outward (bridged by a strand), - sunk into the form
+    tex_kind: str = ""              # raised surface texture: "" = none, else one of texture.KINDS
+    tex_height: float = 0.15        # mm raised above the surface
+    tex_pitch: float = 0.8          # mm centre to centre
+    tex_feature: float = 0.5        # 0.1-1.0 share of the pitch each feature covers
+    tex_angle: float = 0.0          # deg
+    tex_seed: int = 1               # stipple only
 
 
 @dataclass
@@ -93,6 +100,28 @@ def _check_form_opt(opt):
         raise ValueError("draft_deg must be a number from 0 to <90 (got %r)" % (d,))
     if opt.loop:
         _pos("loop_h", opt.loop_h)
+    if opt.tex_kind:
+        if opt.tex_kind not in tex.KINDS:
+            raise ValueError("unknown texture '%s'" % opt.tex_kind)
+        if not (0 < opt.tex_height <= 2.0):
+            raise ValueError("texture height must be above 0 and at most 2 mm")
+        if not (0.3 <= opt.tex_pitch <= 20):
+            raise ValueError("texture pitch must be from 0.3 to 20 mm (finer will not print or press)")
+
+
+def _texture_info(opt):
+    """Steepest texture wall measured from vertical (deg): bigger is safer for release."""
+    r = 0.5 * opt.tex_pitch * min(max(opt.tex_feature, 0.1), 1.0)
+    slope = opt.tex_height * np.pi / (2.0 * r)          # peak slope of the cosine taper
+    return float(90.0 - np.degrees(np.arctan(slope)))
+
+
+def _apply_texture(H, px, opt, origin, mask_from):
+    if not opt.tex_kind:
+        return H
+    return tex.apply(H, px, mask_from=mask_from, kind=opt.tex_kind, height_mm=opt.tex_height,
+                     pitch=opt.tex_pitch, feature=opt.tex_feature, angle=opt.tex_angle,
+                     seed=opt.tex_seed, origin=origin)
 
 
 def _check_mould_opt(opt):
@@ -311,11 +340,15 @@ def curve_heightmap(polylines_mm, closed, opt: FormOptions):
     H = np.zeros((ny, nx))
     H[ii, jj] = _profile(np.where(np.isfinite(d), d, r + 1), r, opt.strand_h, tanw)
     x0, y0 = float(lo[0]), float(lo[1])
+    if opt.tex_kind and H.max() > 0:
+        H = _apply_texture(H, px, opt, (x0, y0), 0.45 * float(H.max()))
     ctr = None
     if opt.loop and H.max() > 0:
         H, ctr = _add_loop(H, x0, y0, px, opt, tanw)
     Hc, org = _crop(H, (x0, y0), px, 0.5)
     info = dict(draft_deg=opt.draft_deg, strand_w=opt.strand_w, strand_h=opt.strand_h)
+    if opt.tex_kind:
+        info["tex_draft_deg"] = _texture_info(opt)
     if clamped is not None:
         info["loop_shift_clamped"] = clamped
     if ctr is not None:
@@ -355,8 +388,13 @@ def surface_heightmap(X, Y, Z, opt: FormOptions):
     Hp = np.pad(H, 1)                                   # draft the footprint edge (no vertical wall)
     e = ndimage.distance_transform_edt(Hp > 0)[1:-1, 1:-1] * px
     H = np.minimum(H, e * tanw)
+    if opt.tex_kind:
+        H = _apply_texture(H, px, opt, (0.0, 0.0), 0.0)
     Hc, org = _crop(H, (-w / 2, -h / 2), px, 0.5)
-    return HeightMap(Hc, dict(draft_deg=opt.draft_deg)), org
+    sinfo = dict(draft_deg=opt.draft_deg)
+    if opt.tex_kind:
+        sinfo["tex_draft_deg"] = _texture_info(opt)
+    return HeightMap(Hc, sinfo), org
 
 
 # ---------------------------------------------------------------- meshes
@@ -761,6 +799,9 @@ def check(H, px, form, mould, two_sided=None, lid=None, centreline_mm=None):
     if d is not None and d < MIN_DRAFT:
         warnings.append("draft %.1f deg < %.0f deg: %s" % (d, MIN_DRAFT, "no draft, the clay will grip the resin walls"
                                                           if d <= 0 else "walls may grip the clay on release"))
+    td = hinfo.get("tex_draft_deg")
+    if td is not None and td < MIN_DRAFT:
+        warnings.append("texture walls only %.1f deg from vertical (< %.0f deg): lower the height or widen the features so the clay releases" % (td, MIN_DRAFT))
     if "strand_h" in hinfo:
         reach = min(hinfo["strand_h"], hinfo["strand_w"] / 2 * np.tan(np.radians(90 - hinfo["draft_deg"])))
         info["strand_reach_mm"] = round(float(reach), 2)

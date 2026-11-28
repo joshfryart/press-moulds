@@ -36,6 +36,12 @@ Sliders start at 1.0, range -5 to 5, step 0.01.
 
 The top of the page opens on the **3D model**: a live preview of the pressed form. Drag to rotate, scroll to zoom, double-click to reset. Switch to **2D plot** with the toggle above it (the animated equation plot and the parameter sweep live there). It uses a coarse pixel so it stays fast; Build gives print quality. After a Build, the 3D preview further down also shows the mould, top half or lid.
 
+## Raised texture
+
+Pick a **Pattern** under *Raised texture* (dots, ridges, crosshatch, waves, rings, scales, stipple) to add a slightly raised design on the strand, which catches paint and light. Sliders: height (0.02-1 mm, 0.1-0.3 is subtle), spacing (0.3-5 mm), feature size, pattern angle, and a seed for stipple. It shows live in the 3D view and is carved into the mould. Use a wide strand (4-6 mm) so the pattern is visible; spacing under 0.3 mm will not print or press. The Check table warns if the texture walls are too steep to release.
+
+![texture samples](../docs/texture-samples.png)
+
 ## Make it
 
 - **Form type**: Full 3D (default) = bottom half + top half pressed together, piece domed both sides. Flat back = one mould + flat lid.
